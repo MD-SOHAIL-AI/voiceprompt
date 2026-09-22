@@ -55,8 +55,6 @@
         "installMode": "currentUser"
       }
     },
-    "resources": [
-      "bin/*"
-    ]
+    "resources": []
   }
 }

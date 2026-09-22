@@ -71,6 +71,16 @@ export async function applyEngineProfile(profile: EngineProfile): Promise<void> 
   await invoke('apply_engine_profile', { profile });
 }
 
+export async function engineStart(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke('engine_start');
+}
+
+export async function engineStop(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke('engine_stop');
+}
+
 export async function setOverlayVisible(visible: boolean): Promise<void> {
   if (!isTauri()) return;
   await invoke('set_overlay_visible', { visible });

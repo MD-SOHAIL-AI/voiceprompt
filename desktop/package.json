@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "build:engine": "powershell -ExecutionPolicy Bypass -File scripts/build-engine.ps1",
-    "build:desktop": "npm run build:engine && npm run build"
+    "build:desktop": "npm run build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

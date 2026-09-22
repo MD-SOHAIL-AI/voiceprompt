@@ -16,6 +16,7 @@ from voiceprompt.instance import SingleInstance
 from voiceprompt.injector import TextInjector, capture_foreground_window
 from voiceprompt.recorder import PushToTalkRecorder, RecorderConfig, Recording
 from voiceprompt.replacements import apply_replacements
+from voiceprompt.sound_feedback import SoundFeedback
 from voiceprompt.startup import set_startup, startup_enabled
 from voiceprompt.transcriber import LocalTranscriber
 from voiceprompt.ui import FloatingPill, TrayApp
@@ -38,6 +39,7 @@ class VoicePromptApp:
         self.transcriber = self._new_transcriber(self.settings)
         self.injector = self._new_injector(self.settings)
         self.cleanup = self._new_cleanup(self.settings)
+        self.sound = SoundFeedback(enabled=self.settings.sound_feedback)
         self.history = TranscriptionHistory(history_path(), limit=self.settings.max_history)
         self.hotkey = PushToTalkHotkey(self.settings.hotkey, self._hotkey_pressed, self._hotkey_released)
         self.pill = FloatingPill(
@@ -109,6 +111,9 @@ class VoicePromptApp:
             return
         self._record_target = capture_foreground_window()
         try:
+            # Play the activation cue before opening the mic so the cue itself
+            # cannot leak into the transcription.
+            self.sound.play_active()
             self.recorder.start()
         except Exception as exc:
             self._record_error(exc)
@@ -120,6 +125,9 @@ class VoicePromptApp:
         target_window = self._record_target
         try:
             recording = self.recorder.stop()
+            # The microphone is fully closed at this point, so the stop cue can
+            # safely play without contaminating the captured audio.
+            self.sound.play_inactive(asynchronous=True)
         except Exception as exc:
             self._record_error(exc)
             self.set_status("idle")
@@ -193,6 +201,7 @@ class VoicePromptApp:
         self.settings = settings
         self.settings.gemini_cleanup = settings.cleanup_provider == "gemini"
         save_settings(settings)
+        self.sound.set_enabled(settings.sound_feedback)
         self.injector = self._new_injector(settings)
         self.cleanup = self._new_cleanup(settings)
         self.history.limit = settings.max_history

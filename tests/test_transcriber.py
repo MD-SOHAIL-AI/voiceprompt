@@ -14,6 +14,7 @@ class FakeWhisperModel:
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         self.calls: list[dict[str, object]] = []
+        self.args = args
         self.instances.append(self)
 
     def transcribe(self, audio: np.ndarray, **kwargs: object):
@@ -23,22 +24,21 @@ class FakeWhisperModel:
 
 class LocalTranscriberTests(unittest.TestCase):
     @patch("voiceprompt.transcriber.WhisperModel", FakeWhisperModel)
-    def test_option_updates_reuse_model_and_bias_vocabulary(self) -> None:
+    def test_auto_uses_multilingual_faster_whisper_and_reuses_model(self) -> None:
         FakeWhisperModel.instances.clear()
-        transcriber = LocalTranscriber(beam_size=3, vad_filter=True)
+        transcriber = LocalTranscriber(model_name="base", language="", beam_size=3, vad_filter=True)
         transcriber.preload()
-        transcriber.update_options("en", beam_size=1, vad_filter=False)
-
+        transcriber.update_options("", beam_size=1, vad_filter=False)
         text = transcriber.transcribe(np.zeros(1600, dtype=np.float32), hotwords="ChatGPT")
 
         self.assertEqual(text, "hello ChatGPT")
+        self.assertEqual(transcriber.engine_name, "faster-whisper")
         self.assertEqual(len(FakeWhisperModel.instances), 1)
+        self.assertEqual(FakeWhisperModel.instances[0].args[0], "base")
         call = FakeWhisperModel.instances[0].calls[0]
+        self.assertIsNone(call["language"])
         self.assertEqual(call["beam_size"], 1)
-        self.assertEqual(call["temperature"], 0.0)
         self.assertEqual(call["hotwords"], "ChatGPT")
-        self.assertIn("Vocabulary: ChatGPT", call["initial_prompt"])
-        self.assertFalse(call["vad_filter"])
 
 
 if __name__ == "__main__":

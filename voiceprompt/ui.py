@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import queue
 import tkinter as tk
+from collections import deque
 from collections.abc import Callable
 from dataclasses import replace
 from tkinter import messagebox, ttk
@@ -21,30 +22,34 @@ CLEANUP_PROVIDERS = ["none", "openrouter", "gemini"]
 
 
 class FloatingPill:
-    PILL_W_IDLE = 64
-    PILL_H = 56
-    PILL_W_ACTIVE = 280
-    BADGE_R = 22
-    BADGE_CX = 32
-    BADGE_CY = 28
-    WAVE_X0 = 68
-    WAVE_Y = 28
-    BAR_COUNT = 18
+    """Small always-on-top waveform capsule.
+
+    Recording bars are driven only by recent microphone levels. Synthetic
+    animation is used only for non-recording states where there is no live
+    microphone signal to visualize.
+    """
+
+    PILL_W_IDLE = 48
+    PILL_W_ACTIVE = 176
+    PILL_H = 44
+    WAVE_Y = PILL_H // 2
+    WAVE_X0 = 14
+    BAR_COUNT = 24
     BAR_W = 3
-    BAR_GAP = 5
-    BAR_MIN_H = 4
+    BAR_GAP = 6
+    BAR_MIN_H = 3
     BAR_MAX_H = 28
     DOT_COUNT = 4
-    DOT_R = 5
+    DOT_R = 4
 
-    _PALETTE: dict[str, tuple[str, str, str]] = {
-        "idle": ("#1a1f2e", "#374151", "#4b5563"),
-        "ready": ("#0d2818", "#22c55e", "#22c55e"),
-        "recording": ("#1a0d0d", "#22c55e", "#22c55e"),
-        "transcribing": ("#071a26", "#0ea5e9", "#0ea5e9"),
-        "cleaning": ("#1a0d26", "#a78bfa", "#a78bfa"),
-        "loading model": ("#1a1200", "#f59e0b", "#f59e0b"),
-        "error": ("#1a0808", "#ef4444", "#ef4444"),
+    _PALETTE: dict[str, tuple[str, str]] = {
+        "idle": ("#374151", "#6b7280"),
+        "ready": ("#22c55e", "#22c55e"),
+        "recording": ("#22c55e", "#4ade80"),
+        "transcribing": ("#0ea5e9", "#38bdf8"),
+        "cleaning": ("#a78bfa", "#c4b5fd"),
+        "loading model": ("#f59e0b", "#fbbf24"),
+        "error": ("#ef4444", "#f87171"),
     }
 
     def __init__(
@@ -67,9 +72,9 @@ class FloatingPill:
         self._status = "idle"
         self._tick = 0
         self._drag_start: tuple[int, int] | None = None
-        self._audio_level = 0.0
-        self._bar_heights = [self.BAR_MIN_H] * self.BAR_COUNT
-        self._bar_targets = [self.BAR_MIN_H] * self.BAR_COUNT
+        self._audio_history: deque[float] = deque([0.0] * self.BAR_COUNT, maxlen=self.BAR_COUNT)
+        self._bar_heights = [float(self.BAR_MIN_H)] * self.BAR_COUNT
+        self._bar_targets = [float(self.BAR_MIN_H)] * self.BAR_COUNT
         self._settings_window: SettingsWindow | None = None
 
     def run(self) -> None:
@@ -88,7 +93,14 @@ class FloatingPill:
         x = settings.pill_position_x if settings.pill_position_x >= 0 else 90
         y = settings.pill_position_y if settings.pill_position_y >= 0 else 520
         root.geometry(f"{self.PILL_W_IDLE}x{self.PILL_H}+{x}+{y}")
-        canvas = tk.Canvas(root, width=self.PILL_W_IDLE, height=self.PILL_H, bg="#ff00ff", highlightthickness=0, bd=0)
+        canvas = tk.Canvas(
+            root,
+            width=self.PILL_W_IDLE,
+            height=self.PILL_H,
+            bg="#ff00ff",
+            highlightthickness=0,
+            bd=0,
+        )
         canvas.pack(fill="both", expand=True)
         self._canvas = canvas
 
@@ -116,6 +128,7 @@ class FloatingPill:
         self._events.put(("status", status))
 
     def set_audio_level(self, level: float) -> None:
+        # Keep the audio callback cheap; Tk consumes these values on its UI thread.
         self._events.put(("audio", max(0.0, min(1.0, float(level)))))
 
     def open_settings_window(self, on_save: Callable[[Settings], None]) -> None:
@@ -132,10 +145,12 @@ class FloatingPill:
                 previous = self._status
                 self._status = str(payload)
                 if previous != self._status:
+                    if self._status == "recording":
+                        self._audio_history = deque([0.0] * self.BAR_COUNT, maxlen=self.BAR_COUNT)
                     self._resize_pill()
                 self._draw()
             elif name == "audio":
-                self._audio_level = float(payload)
+                self._audio_history.append(float(payload))
             elif name == "settings" and self._root:
                 if self._settings_window is None or not self._settings_window.is_open:
                     self._settings_window = SettingsWindow(self.get_settings(), payload)  # type: ignore[arg-type]
@@ -147,90 +162,137 @@ class FloatingPill:
                 return
 
         if self._root:
-            self._root.after(50, self._poll)
+            self._root.after(40, self._poll)
 
     def _animate(self) -> None:
         self._tick += 1
-        if self._status != "idle":
-            self._update_bar_targets()
-            self._step_bars()
-            self._draw()
+        self._update_bar_targets()
+        self._step_bars()
+        self._draw()
         if self._root:
-            self._root.after(50, self._animate)
+            self._root.after(40, self._animate)  # ~25 fps
 
     def _resize_pill(self) -> None:
         if not self._root or not self._canvas:
             return
-        width = self.PILL_W_IDLE if self._status == "idle" else self.PILL_W_ACTIVE
+        width = self.PILL_W_IDLE if self._status in {"idle", "ready"} else self.PILL_W_ACTIVE
         self._root.geometry(f"{width}x{self.PILL_H}+{self._root.winfo_x()}+{self._root.winfo_y()}")
         self._canvas.config(width=width, height=self.PILL_H)
 
     def _update_bar_targets(self) -> None:
         if self._status == "recording":
-            level = max(0.05, self._audio_level)
-            for i in range(self.BAR_COUNT):
-                shape = 0.45 + 0.55 * abs(math.sin((self._tick * 0.32) + i * 0.73))
-                value = self.BAR_MIN_H + (self.BAR_MAX_H - self.BAR_MIN_H) * min(1.0, level * 1.6) * shape
-                self._bar_targets[i] = int(value)
-        elif self._status in {"transcribing", "cleaning"}:
+            # Every bar is a real recent microphone loudness sample. The left
+            # side is older audio; the right side is the newest audio.
+            values = list(self._audio_history)
+            span = self.BAR_MAX_H - self.BAR_MIN_H
+            for i, level in enumerate(values):
+                # Mild perceptual compression keeps quiet speech visible while
+                # preserving the difference between quiet and loud syllables.
+                shaped = math.pow(max(0.0, min(1.0, level)), 0.72)
+                self._bar_targets[i] = self.BAR_MIN_H + span * shaped
+            return
+
+        if self._status in {"transcribing", "cleaning"}:
             active = self._tick % self.BAR_COUNT
             for i in range(self.BAR_COUNT):
                 distance = min(abs(i - active), self.BAR_COUNT - abs(i - active))
-                self._bar_targets[i] = max(self.BAR_MIN_H, self.BAR_MAX_H - distance * 3)
-        elif self._status == "loading model":
+                self._bar_targets[i] = max(self.BAR_MIN_H, self.BAR_MAX_H - distance * 4)
+            return
+
+        if self._status == "loading model":
             for i in range(self.BAR_COUNT):
-                phase = math.sin((self._tick * 0.3) + i * 0.5) * 0.5 + 0.5
-                self._bar_targets[i] = int(self.BAR_MIN_H + (self.BAR_MAX_H - self.BAR_MIN_H) * phase * 0.6)
-        else:
-            self._bar_targets = [self.BAR_MIN_H] * self.BAR_COUNT
+                phase = math.sin((self._tick * 0.24) + i * 0.45) * 0.5 + 0.5
+                self._bar_targets[i] = self.BAR_MIN_H + (self.BAR_MAX_H - self.BAR_MIN_H) * phase * 0.55
+            return
+
+        self._bar_targets = [float(self.BAR_MIN_H)] * self.BAR_COUNT
 
     def _step_bars(self) -> None:
         for i in range(self.BAR_COUNT):
-            self._bar_heights[i] += (self._bar_targets[i] - self._bar_heights[i]) * 0.35
+            target = self._bar_targets[i]
+            current = self._bar_heights[i]
+            # Faster attack, gentler release makes speech feel responsive but
+            # avoids jitter between adjacent microphone callbacks.
+            factor = 0.62 if target > current else 0.34
+            self._bar_heights[i] += (target - current) * factor
 
     def _draw(self) -> None:
         if not self._canvas:
             return
+
         canvas = self._canvas
         canvas.delete("all")
-        is_idle = self._status == "idle"
-        width = self.PILL_W_IDLE if is_idle else self.PILL_W_ACTIVE
-        badge_fill, glow, bar_color = self._PALETTE.get(self._status, self._PALETTE["idle"])
+        compact = self._status in {"idle", "ready"}
+        width = self.PILL_W_IDLE if compact else self.PILL_W_ACTIVE
+        outline, accent = self._PALETTE.get(self._status, self._PALETTE["idle"])
 
-        canvas.create_polygon(self._pill_points(4, 4, width - 4, self.PILL_H - 4, 24), smooth=True, splinesteps=32, fill="", outline=glow, width=1)
-        canvas.create_polygon(self._pill_points(8, 6, width - 8, self.PILL_H - 6, 22), smooth=True, splinesteps=32, fill="#0d1117", outline="#1e2533", width=1)
+        # Minimal capsule: no badge and no logo.
+        canvas.create_polygon(
+            self._pill_points(2, 2, width - 2, self.PILL_H - 2, 20),
+            smooth=True,
+            splinesteps=32,
+            fill="#0b0f14",
+            outline=outline,
+            width=2 if self._status == "recording" else 1,
+        )
 
-        cx, cy, r = self.BADGE_CX, self.BADGE_CY, self.BADGE_R
-        canvas.create_oval(cx-r-4, cy-r-4, cx+r+4, cy+r+4, fill="", outline=glow, width=2)
-        canvas.create_oval(cx-r, cy-r, cx+r, cy+r, fill=badge_fill, outline=glow, width=1)
-        canvas.create_polygon(cx+2, cy-12, cx-4, cy-1, cx+1, cy-1, cx-3, cy+12, cx+6, cy, cx+1, cy, fill=glow, outline="")
+        if compact:
+            # A quiet center pulse is enough to show the background utility is alive.
+            pulse = 3 if self._status == "idle" else 5
+            canvas.create_oval(
+                width // 2 - pulse,
+                self.WAVE_Y - pulse,
+                width // 2 + pulse,
+                self.WAVE_Y + pulse,
+                fill=accent,
+                outline="",
+            )
+            return
 
-        if not is_idle:
-            if self._status in {"loading model", "transcribing"} and self._tick % 20 < 10:
-                self._draw_dots(canvas, bar_color)
-            else:
-                self._draw_waveform(canvas, bar_color)
+        if self._status in {"transcribing", "cleaning"}:
+            self._draw_processing_dots(canvas, accent)
+        else:
+            self._draw_waveform(canvas, accent)
 
     def _draw_waveform(self, canvas: tk.Canvas, color: str) -> None:
         for i, height in enumerate(self._bar_heights):
             x = self.WAVE_X0 + i * self.BAR_GAP
-            half = int(height) // 2
-            canvas.create_rectangle(x, self.WAVE_Y-half, x+self.BAR_W, self.WAVE_Y+half, fill=color, outline="")
+            half = max(1, int(height) // 2)
+            canvas.create_rectangle(
+                x,
+                self.WAVE_Y - half,
+                x + self.BAR_W,
+                self.WAVE_Y + half,
+                fill=color,
+                outline="",
+            )
 
-    def _draw_dots(self, canvas: tk.Canvas, color: str) -> None:
-        total_width = (self.DOT_COUNT - 1) * 28
-        x0 = self.WAVE_X0 + (self.PILL_W_ACTIVE - self.WAVE_X0 - total_width) // 2
+    def _draw_processing_dots(self, canvas: tk.Canvas, color: str) -> None:
+        spacing = 24
+        total_width = (self.DOT_COUNT - 1) * spacing
+        x0 = (self.PILL_W_ACTIVE - total_width) // 2
         for i in range(self.DOT_COUNT):
-            phase = math.sin((self._tick * 0.4) - i) * 0.5 + 0.5
-            offset = int(phase * 8)
-            x = x0 + i * 28
+            phase = math.sin((self._tick * 0.38) - i * 0.9) * 0.5 + 0.5
+            offset = int(phase * 6)
+            x = x0 + i * spacing
             r = self.DOT_R
-            canvas.create_oval(x-r, self.WAVE_Y-r-offset, x+r, self.WAVE_Y+r-offset, fill=color, outline="")
+            canvas.create_oval(
+                x - r,
+                self.WAVE_Y - r - offset,
+                x + r,
+                self.WAVE_Y + r - offset,
+                fill=color,
+                outline="",
+            )
 
     @staticmethod
     def _pill_points(x1: int, y1: int, x2: int, y2: int, r: int) -> list[int]:
-        r = min(r, (y2-y1)//2, (x2-x1)//2)
-        return [x1+r,y1,x2-r,y1,x2,y1,x2,y1+r,x2,y2-r,x2,y2,x2-r,y2,x1+r,y2,x1,y2,x1,y2-r,x1,y1+r,x1,y1]
+        r = min(r, (y2 - y1) // 2, (x2 - x1) // 2)
+        return [
+            x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r,
+            x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2,
+            x1, y2, x1, y2 - r, x1, y1 + r, x1, y1,
+        ]
 
     def _start_drag(self, event: tk.Event) -> None:
         self._drag_start = (event.x_root, event.y_root)
@@ -315,11 +377,15 @@ class TrayApp:
 
     @staticmethod
     def _image() -> Image.Image:
-        image = Image.new("RGB", (64, 64), "#111827")
+        # Minimal waveform tray identity; no product logo/badge.
+        image = Image.new("RGB", (64, 64), "#0b0f14")
         draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle((14, 8, 50, 42), radius=16, fill="#22c55e")
-        draw.rectangle((29, 39, 35, 52), fill="#22c55e")
-        draw.rounded_rectangle((22, 50, 42, 56), radius=3, fill="#22c55e")
+        heights = [12, 22, 34, 46, 30, 18, 38, 26, 14]
+        x = 8
+        for height in heights:
+            y0 = (64 - height) // 2
+            draw.rounded_rectangle((x, y0, x + 3, y0 + height), radius=1, fill="#22c55e")
+            x += 6
         return image
 
 
@@ -360,7 +426,11 @@ class SettingsWindow:
         vad = tk.BooleanVar(value=self.settings.vad_filter)
         save_history = tk.BooleanVar(value=self.settings.save_history)
         cleanup_provider = tk.StringVar(value=self.settings.cleanup_provider)
-        cloud_model = tk.StringVar(value=self.settings.gemini_model if self.settings.cleanup_provider == "gemini" else self.settings.openrouter_model)
+        cloud_model = tk.StringVar(
+            value=self.settings.gemini_model
+            if self.settings.cleanup_provider == "gemini"
+            else self.settings.openrouter_model
+        )
         cleanup_timeout = tk.DoubleVar(value=self.settings.cleanup_timeout_seconds)
         preserve_clipboard = tk.BooleanVar(value=self.settings.preserve_clipboard)
         restore_focus = tk.BooleanVar(value=self.settings.restore_focus_on_paste)

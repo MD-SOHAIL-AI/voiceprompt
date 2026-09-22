@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
+from dataclasses import dataclass
+from difflib import SequenceMatcher
 from urllib import request
 
 from google import genai
@@ -8,21 +11,30 @@ from google.genai import types
 
 from voiceprompt.config import gemini_api_key, openrouter_api_key
 
-
 SYSTEM_PROMPT = """You clean speech-to-text dictation for direct insertion.
 Fix only obvious recognition errors, punctuation, casing, and spacing.
-Preserve the speaker's meaning, wording, numbers, names, and code terms.
+Preserve the speaker's meaning, wording, numbers, names, URLs, file paths, and code terms.
 Return only the cleaned text. Never add commentary or quotation marks."""
+
+_PROTECTED_TOKEN = re.compile(
+    r"https?://\S+|\b[\w.+-]+@[\w.-]+\.\w+\b|\b0x[0-9a-fA-F]+\b|"
+    r"\b\d+(?:\.\d+)?(?:%|ms|s|Hz|kHz|MHz|GB|MB|KB)?\b|"
+    r"(?<!\w)(?:C\+\+|C#|\.NET|GPIO\d*|ESP32)(?!\w)",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class CleanupResult:
+    text: str
+    attempted: bool = False
+    applied: bool = False
+    provider: str = "none"
+    error: str = ""
 
 
 class CloudCleanup:
-    def __init__(
-        self,
-        provider: str,
-        openrouter_model: str,
-        gemini_model: str,
-        timeout_seconds: float = 4.0,
-    ) -> None:
+    def __init__(self, provider: str, openrouter_model: str, gemini_model: str, timeout_seconds: float = 4.0) -> None:
         self.provider = provider
         self.openrouter_model = openrouter_model
         self.gemini_model = gemini_model
@@ -41,27 +53,34 @@ class CloudCleanup:
             return bool(gemini_api_key())
         return False
 
-    def clean(self, text: str) -> str:
+    def clean(self, text: str) -> CleanupResult:
         if not self.enabled or not text.strip() or not self.available:
-            return text
+            return CleanupResult(text=text, provider=self.provider)
         try:
             cleaned = self._clean_openrouter(text) if self.provider == "openrouter" else self._clean_gemini(text)
             cleaned = cleaned.strip()
-            if not cleaned:
-                return text
-            if len(cleaned) > max(120, len(text) * 2.5) or len(cleaned) < len(text) * 0.35:
-                return text
-            return cleaned
-        except Exception:
-            return text
+            if not self._acceptable(text, cleaned):
+                return CleanupResult(text=text, attempted=True, provider=self.provider, error="cleanup rejected by integrity guard")
+            return CleanupResult(text=cleaned, attempted=True, applied=cleaned != text, provider=self.provider)
+        except Exception as exc:
+            return CleanupResult(text=text, attempted=True, provider=self.provider, error=f"{type(exc).__name__}: {exc}")
+
+    @staticmethod
+    def _acceptable(original: str, cleaned: str) -> bool:
+        if not cleaned:
+            return False
+        if len(cleaned) > max(120, len(original) * 2.0) or len(cleaned) < len(original) * 0.5:
+            return False
+        lowered = cleaned.casefold()
+        for token in _PROTECTED_TOKEN.findall(original):
+            if token.casefold() not in lowered:
+                return False
+        return SequenceMatcher(None, original.casefold(), cleaned.casefold()).ratio() >= 0.45
 
     def _clean_openrouter(self, text: str) -> str:
         payload = {
             "model": self.openrouter_model or "openrouter/free",
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": text},
-            ],
+            "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": text}],
             "temperature": 0,
             "max_tokens": min(512, max(64, len(text) // 2 + 32)),
             "provider": {"sort": "latency"},
@@ -69,11 +88,7 @@ class CloudCleanup:
         api_request = request.Request(
             "https://openrouter.ai/api/v1/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {openrouter_api_key()}",
-                "Content-Type": "application/json",
-                "X-Title": "Voice Prompt",
-            },
+            headers={"Authorization": f"Bearer {openrouter_api_key()}", "Content-Type": "application/json", "X-Title": "Voice Prompt"},
             method="POST",
         )
         with request.urlopen(api_request, timeout=self.timeout_seconds) as response:

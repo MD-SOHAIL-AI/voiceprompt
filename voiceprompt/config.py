@@ -27,7 +27,7 @@ ASR_BACKENDS = {"auto", "faster_whisper", "whisper_cpp"}
 
 @dataclass
 class Settings:
-    config_version: int = 3
+    config_version: int = 4
     hotkey: str = "right_ctrl"
     asr_backend: str = "auto"
     model: str = "base"
@@ -41,6 +41,7 @@ class Settings:
     whisper_cpp_threads: int = 4
     input_device: str = ""
     max_recording_seconds: float = 30.0
+    sound_feedback: bool = True
     paste_injection: bool = True
     preserve_clipboard: bool = True
     restore_focus_on_paste: bool = True
@@ -97,12 +98,14 @@ def load_settings() -> Settings:
             values["language"] = ""
         if "save_history" not in values:
             values["save_history"] = False
+    if data.get("config_version", 1) < 4 and "sound_feedback" not in values:
+        values["sound_feedback"] = True
 
     if "cleanup_provider" not in data and data.get("gemini_cleanup"):
         values["cleanup_provider"] = "gemini"
 
     settings = Settings(**values)
-    settings.config_version = 3
+    settings.config_version = 4
     settings.asr_backend = settings.asr_backend if settings.asr_backend in ASR_BACKENDS else "auto"
     if settings.cleanup_provider not in {"none", "openrouter", "gemini"}:
         settings.cleanup_provider = "none"

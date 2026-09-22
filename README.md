@@ -3,7 +3,7 @@
 Voice Prompt is a lightweight Windows push-to-talk dictation utility for AI prompts, coding, notes, browsers, editors, and terminals.
 
 ```text
-hold hotkey -> speak -> local ASR -> optional cleanup -> safe paste
+hold hotkey -> activation tone -> speak -> local ASR -> release -> deactivation tone -> optional cleanup -> safe paste
 ```
 
 ## Default setup
@@ -17,6 +17,18 @@ Recommended modes for an 8 GB Windows laptop:
 - Fast/default: `base`, multilingual, CPU/int8
 - Accuracy: `small`, multilingual, CPU/int8
 - Native/experimental: whisper.cpp with a quantized multilingual model
+
+## Recording sound feedback
+
+Sound feedback is enabled by default so you can use Voice Prompt without looking at the floating pill:
+
+- **Hotkey activates recording:** a short ascending two-tone cue plays.
+- **Hotkey is released / recording stops:** a short descending two-tone cue plays.
+- The activation cue finishes **before the microphone opens**, so Voice Prompt does not transcribe its own notification sound.
+- The deactivation cue plays only **after the microphone is fully closed**, including the final-phoneme grace window.
+- The cues are available in both push-to-talk and toggle recording modes.
+- Sound feedback can be disabled from **Settings** or directly from the tray menu.
+- If Windows cannot play the tone, dictation continues normally; sound feedback never blocks the core workflow.
 
 ## Reliability and privacy improvements
 
@@ -53,9 +65,10 @@ The first run can take longer while Whisper is downloaded and cached.
 
 1. Place the cursor in the target text field.
 2. Hold **Right Ctrl**.
-3. Speak.
+3. Wait for the short rising activation cue, then speak.
 4. Release **Right Ctrl**.
-5. Voice Prompt transcribes locally and pastes back into the original target window.
+5. Hear the short falling deactivation cue.
+6. Voice Prompt transcribes locally and pastes back into the original target window.
 
 Very short accidental taps are ignored. Toggle mode is available in Settings.
 

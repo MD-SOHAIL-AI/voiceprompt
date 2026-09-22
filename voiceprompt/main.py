@@ -112,8 +112,6 @@ class VoicePromptApp:
             return
         self._record_target = capture_foreground_window()
         try:
-            # Finish the activation cue before the microphone opens so the
-            # cue itself cannot leak into transcription.
             self.sound.play_active()
             self.recorder.start()
         except Exception as exc:
@@ -126,8 +124,6 @@ class VoicePromptApp:
         target_window = self._record_target
         try:
             recording = self.recorder.stop()
-            # recorder.stop() includes final-phoneme grace and fully closes the
-            # microphone before this cue is played.
             self.sound.play_inactive(asynchronous=True)
         except Exception as exc:
             self._record_error(exc)
@@ -283,8 +279,21 @@ class VoicePromptApp:
     def _on_audio_chunk(self, audio: np.ndarray) -> None:
         if audio.size == 0:
             return
-        rms = float(np.sqrt(np.mean(np.square(audio.astype(np.float32, copy=False)))))
-        self.pill.set_audio_level(min(1.0, rms * 10.0))
+
+        samples = audio.astype(np.float32, copy=False).reshape(-1)
+        # Calculate one real loudness value per microphone callback. The UI
+        # keeps a rolling history of these values, so the visible bars are a
+        # genuine recent envelope instead of a synthetic animation.
+        rms = float(np.sqrt(np.mean(np.square(samples))))
+
+        # Ignore low background noise, then map typical speech into 0..1.
+        noise_floor = 0.008
+        if rms <= noise_floor:
+            level = 0.0
+        else:
+            level = min(1.0, (rms - noise_floor) / 0.12)
+
+        self.pill.set_audio_level(level)
 
     def _preload_model_worker(self, previous: str) -> None:
         try:

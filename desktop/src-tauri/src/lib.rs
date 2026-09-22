@@ -11,7 +11,7 @@ struct EngineState {
 }
 
 struct EngineProcess {
-    child: Option<Child>,
+    _child: Option<Child>,
     stdin: Option<ChildStdin>,
 }
 
@@ -62,7 +62,7 @@ fn spawn_engine(app: &AppHandle) -> Result<EngineProcess, String> {
         }
     });
 
-    Ok(EngineProcess { child: Some(child), stdin: Some(stdin) })
+    Ok(EngineProcess { _child: Some(child), stdin: Some(stdin) })
 }
 
 #[tauri::command]
@@ -98,7 +98,7 @@ pub fn run() {
             }
         }))
         .setup(|app| {
-            let engine = spawn_engine(&app.handle())?;
+            let engine = spawn_engine(&app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
             app.manage(EngineState { process: Mutex::new(engine) });
             Ok(())
         })

@@ -1,23 +1,21 @@
-"""JSON-lines bridge between the Tauri desktop shell and the hardened Voice Prompt engine.
+"""JSON-lines bridge used by the Voice Prompt V2 Tauri shell.
 
-The bridge deliberately owns no UI.  It validates every command, emits structured events,
-and reuses the existing recorder/transcriber/injector implementation so V2 does not fork
-core dictation behavior.
+V2 intentionally reuses the hardened recorder, local transcriber, replacements and safe
+paste injector instead of maintaining a second dictation implementation.
 """
 from __future__ import annotations
 
 import json
-import queue
 import sys
 import threading
 import time
 import traceback
-from dataclasses import asdict
 from typing import Any
 
-from voiceprompt.config import Settings
-from voiceprompt.injector import TextInjector
-from voiceprompt.recorder import AudioRecorder
+import numpy as np
+
+from voiceprompt.injector import TextInjector, capture_foreground_window
+from voiceprompt.recorder import PushToTalkRecorder, RecorderConfig, Recording
 from voiceprompt.replacements import apply_replacements
 from voiceprompt.sound_feedback import SoundFeedback
 from voiceprompt.transcriber import LocalTranscriber
@@ -30,51 +28,63 @@ class DesktopEngine:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._profile: dict[str, Any] = {}
-        self._recorder: AudioRecorder | None = None
+        self._recorder: PushToTalkRecorder | None = None
         self._transcriber: LocalTranscriber | None = None
-        self._injector = TextInjector()
+        self._transcriber_key: tuple[str, str] | None = None
         self._sound = SoundFeedback(True)
-        self._started_at = 0.0
+        self._target_window: int | None = None
         self._busy = False
 
     def emit(self, kind: str, **payload: Any) -> None:
-        message = {"kind": kind, **payload}
-        sys.stdout.write(json.dumps(message, ensure_ascii=False) + "\n")
+        sys.stdout.write(json.dumps({"kind": kind, **payload}, ensure_ascii=False) + "\n")
         sys.stdout.flush()
 
     def configure(self, profile: dict[str, Any]) -> None:
         with self._lock:
             self._profile = dict(profile)
             self._sound.set_enabled(bool(profile.get("soundFeedback", True)))
-            self._transcriber = None
+            key = (str(profile.get("transcriptionModel") or "base"), str(profile.get("language") or "auto"))
+            if key != self._transcriber_key:
+                self._transcriber = None
+                self._transcriber_key = key
         self.emit("ready")
 
-    def _settings(self) -> Settings:
-        p = self._profile
-        return Settings(
-            model=str(p.get("transcriptionModel") or "base"),
-            language="" if p.get("language", "auto") == "auto" else str(p.get("language", "")),
-            recording_mode=str(p.get("recordingMode") or "ptt"),
-            sound_feedback=bool(p.get("soundFeedback", True)),
-            paste_injection=bool(p.get("autoPaste", True)),
-            restore_focus_on_paste=bool(p.get("restoreTargetFocus", True)),
-            replacements={str(k): str(v) for k, v in dict(p.get("customReplacements") or {}).items()},
-        )
+    def _local_transcriber(self) -> LocalTranscriber:
+        model = str(self._profile.get("transcriptionModel") or "base")
+        language = str(self._profile.get("language") or "auto")
+        if language == "auto":
+            language = ""
+        if self._transcriber is None:
+            self._transcriber = LocalTranscriber(
+                backend="auto",
+                model_name=model,
+                language=language,
+                device="cpu",
+                compute_type="int8",
+                beam_size=3,
+                vad_filter=True,
+            )
+        return self._transcriber
 
     def start(self) -> None:
         with self._lock:
             if self._busy or self._recorder is not None:
                 return
-            settings = self._settings()
             self._sound.play_active()
-            self._recorder = AudioRecorder(
-                input_device=settings.input_device,
-                max_recording_seconds=settings.max_recording_seconds,
-                on_level=lambda level: self.emit("waveform", level=max(0.0, min(1.0, float(level) * 10.0))),
-            )
-            self._recorder.start()
-            self._started_at = time.perf_counter()
+            recorder = PushToTalkRecorder(RecorderConfig(max_seconds=30.0))
+            recorder.on_audio_chunk = self._on_audio
+            recorder.on_max_duration = self.stop
+            recorder.start()
+            self._recorder = recorder
+            self._target_window = capture_foreground_window()
         self.emit("status", status="recording")
+
+    def _on_audio(self, chunk: np.ndarray) -> None:
+        try:
+            rms = float(np.sqrt(np.mean(np.square(chunk.astype(np.float64)))))
+            self.emit("waveform", level=max(0.0, min(1.0, rms * 10.0)))
+        except Exception:
+            pass
 
     def stop(self) -> None:
         with self._lock:
@@ -84,7 +94,7 @@ class DesktopEngine:
             self._recorder = None
             self._busy = True
         try:
-            audio = recorder.stop()
+            recording = recorder.stop()
             self._sound.play_inactive(asynchronous=True)
         except Exception as exc:
             with self._lock:
@@ -92,49 +102,58 @@ class DesktopEngine:
             self.emit("error", message=f"Recording failed: {exc}")
             self.emit("ready")
             return
-        threading.Thread(target=self._process, args=(audio,), daemon=True).start()
+        if recording is None:
+            with self._lock:
+                self._busy = False
+            self.emit("ready")
+            return
+        threading.Thread(target=self._process, args=(recording,), daemon=True).start()
 
-    def _process(self, audio: Any) -> None:
+    def _process(self, recording: Recording) -> None:
+        started = time.perf_counter()
         try:
-            settings = self._settings()
+            mode = str(self._profile.get("engineMode") or "local")
+            provider = str(self._profile.get("transcriptionProvider") or "local")
+            if mode == "cloud" or (mode == "auto" and provider != "local"):
+                raise RuntimeError("Cloud transcription is not enabled in this build yet. Select Local mode.")
+
             self.emit("status", status="transcribing")
-            started = time.perf_counter()
-            if self._transcriber is None:
-                self._transcriber = LocalTranscriber(settings)
-            text = self._transcriber.transcribe(audio)
-            if not isinstance(text, str):
-                text = getattr(text, "text", str(text))
-            text = apply_replacements(text.strip(), settings.replacements)
-            transcribe_ms = int((time.perf_counter() - started) * 1000)
+            transcribe_started = time.perf_counter()
+            text = self._local_transcriber().transcribe(recording.audio)
+            transcribe_ms = int((time.perf_counter() - transcribe_started) * 1000)
+            replacements = {str(k): str(v) for k, v in dict(self._profile.get("customReplacements") or {}).items()}
+            text = apply_replacements(text.strip(), replacements)
             if not text:
                 raise RuntimeError("No speech was detected.")
 
             paste_ms = 0
-            if settings.paste_injection:
+            if bool(self._profile.get("autoPaste", True)):
                 paste_started = time.perf_counter()
-                self._injector.inject(text, restore_clipboard=settings.preserve_clipboard)
+                injector = TextInjector(
+                    preserve_clipboard=True,
+                    restore_focus_on_paste=bool(self._profile.get("restoreTargetFocus", True)),
+                )
+                if not injector.inject(text, target_window=self._target_window):
+                    raise RuntimeError("The original target window is unavailable; transcript was not pasted.")
                 paste_ms = int((time.perf_counter() - paste_started) * 1000)
 
-            total_ms = int((time.perf_counter() - self._started_at) * 1000)
-            self.emit(
-                "result",
-                result={
-                    "id": f"local-{time.time_ns()}",
-                    "text": text,
-                    "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "audioDurationMs": max(0, total_ms - transcribe_ms - paste_ms),
-                    "transcriptionMs": transcribe_ms,
-                    "cleanupMs": 0,
-                    "pasteMs": paste_ms,
-                    "totalMs": total_ms,
-                    "provider": "local",
-                    "model": settings.model,
-                    "language": settings.language or "auto",
-                    "costUsd": None,
-                    "targetApp": None,
-                    "source": "local",
-                },
-            )
+            total_ms = int((time.perf_counter() - started) * 1000)
+            self.emit("result", result={
+                "id": f"local-{time.time_ns()}",
+                "text": text,
+                "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "audioDurationMs": int(recording.duration_seconds * 1000),
+                "transcriptionMs": transcribe_ms,
+                "cleanupMs": 0,
+                "pasteMs": paste_ms,
+                "totalMs": total_ms,
+                "provider": "local",
+                "model": str(self._profile.get("transcriptionModel") or "base"),
+                "language": str(self._profile.get("language") or "auto"),
+                "costUsd": None,
+                "targetApp": None,
+                "source": "local",
+            })
             time.sleep(0.25)
             self.emit("ready")
         except Exception as exc:
@@ -143,6 +162,7 @@ class DesktopEngine:
         finally:
             with self._lock:
                 self._busy = False
+                self._target_window = None
 
     def shutdown(self) -> None:
         with self._lock:

@@ -30,12 +30,16 @@ fn spawn_engine(app: &AppHandle) -> Result<EngineProcess, String> {
         cmd.args(["-u", "-m", "voiceprompt.desktop_sidecar"]);
         cmd
     } else {
-        let exe = app
-            .path()
-            .resource_dir()
-            .map_err(|e| e.to_string())?
-            .join("bin")
-            .join(if cfg!(windows) { "voiceprompt-engine.exe" } else { "voiceprompt-engine" });
+        let override_path = std::env::var_os("VOICEPROMPT_ENGINE").map(std::path::PathBuf::from);
+        let exe = if let Some(path) = override_path {
+            path
+        } else {
+            app.path()
+                .resource_dir()
+                .map_err(|e| e.to_string())?
+                .join("bin")
+                .join(if cfg!(windows) { "voiceprompt-engine.exe" } else { "voiceprompt-engine" })
+        };
         Command::new(exe)
     };
 

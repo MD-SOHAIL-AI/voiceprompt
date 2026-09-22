@@ -36,6 +36,7 @@ class FloatingPill:
     BAR_MAX_H = 28
     DOT_COUNT = 4
     DOT_R = 5
+
     _PALETTE: dict[str, tuple[str, str, str]] = {
         "idle": ("#1a1f2e", "#374151", "#4b5563"),
         "ready": ("#0d2818", "#22c55e", "#22c55e"),
@@ -46,7 +47,14 @@ class FloatingPill:
         "error": ("#1a0808", "#ef4444", "#ef4444"),
     }
 
-    def __init__(self, get_settings: Callable[[], Settings], on_open_settings: Callable[[], None], on_retry: Callable[[], None], on_quit: Callable[[], None], on_moved: Callable[[int, int], None]) -> None:
+    def __init__(
+        self,
+        get_settings: Callable[[], Settings],
+        on_open_settings: Callable[[], None],
+        on_retry: Callable[[], None],
+        on_quit: Callable[[], None],
+        on_moved: Callable[[int, int], None],
+    ) -> None:
         self.get_settings = get_settings
         self.on_open_settings = on_open_settings
         self.on_retry = on_retry
@@ -76,22 +84,26 @@ class FloatingPill:
             root.attributes("-transparentcolor", "#ff00ff")
         except tk.TclError:
             pass
+
         x = settings.pill_position_x if settings.pill_position_x >= 0 else 90
         y = settings.pill_position_y if settings.pill_position_y >= 0 else 520
         root.geometry(f"{self.PILL_W_IDLE}x{self.PILL_H}+{x}+{y}")
         canvas = tk.Canvas(root, width=self.PILL_W_IDLE, height=self.PILL_H, bg="#ff00ff", highlightthickness=0, bd=0)
         canvas.pack(fill="both", expand=True)
         self._canvas = canvas
+
         canvas.bind("<ButtonPress-1>", self._start_drag)
         canvas.bind("<B1-Motion>", self._drag)
         canvas.bind("<ButtonRelease-1>", self._end_drag)
         canvas.bind("<Button-3>", self._show_menu)
         canvas.bind("<Double-Button-1>", lambda event: self.on_open_settings())
+
         self._menu = tk.Menu(root, tearoff=False)
         self._menu.add_command(label="Open settings", command=self.on_open_settings)
         self._menu.add_command(label="Retry last transcription", command=self.on_retry)
         self._menu.add_separator()
         self._menu.add_command(label="Quit", command=self.on_quit)
+
         self._draw()
         self._poll()
         self._animate()
@@ -115,10 +127,11 @@ class FloatingPill:
                 name, payload = self._events.get_nowait()
             except queue.Empty:
                 break
+
             if name == "status":
-                old = self._status
+                previous = self._status
                 self._status = str(payload)
-                if old != self._status:
+                if previous != self._status:
                     self._resize_pill()
                 self._draw()
             elif name == "audio":
@@ -132,6 +145,7 @@ class FloatingPill:
             elif name == "stop" and self._root:
                 self._root.destroy()
                 return
+
         if self._root:
             self._root.after(50, self._poll)
 
@@ -147,9 +161,9 @@ class FloatingPill:
     def _resize_pill(self) -> None:
         if not self._root or not self._canvas:
             return
-        w = self.PILL_W_IDLE if self._status == "idle" else self.PILL_W_ACTIVE
-        self._root.geometry(f"{w}x{self.PILL_H}+{self._root.winfo_x()}+{self._root.winfo_y()}")
-        self._canvas.config(width=w, height=self.PILL_H)
+        width = self.PILL_W_IDLE if self._status == "idle" else self.PILL_W_ACTIVE
+        self._root.geometry(f"{width}x{self.PILL_H}+{self._root.winfo_x()}+{self._root.winfo_y()}")
+        self._canvas.config(width=width, height=self.PILL_H)
 
     def _update_bar_targets(self) -> None:
         if self._status == "recording":
@@ -161,8 +175,8 @@ class FloatingPill:
         elif self._status in {"transcribing", "cleaning"}:
             active = self._tick % self.BAR_COUNT
             for i in range(self.BAR_COUNT):
-                dist = min(abs(i - active), self.BAR_COUNT - abs(i - active))
-                self._bar_targets[i] = max(self.BAR_MIN_H, self.BAR_MAX_H - dist * 3)
+                distance = min(abs(i - active), self.BAR_COUNT - abs(i - active))
+                self._bar_targets[i] = max(self.BAR_MIN_H, self.BAR_MAX_H - distance * 3)
         elif self._status == "loading model":
             for i in range(self.BAR_COUNT):
                 phase = math.sin((self._tick * 0.3) + i * 0.5) * 0.5 + 0.5
@@ -180,14 +194,17 @@ class FloatingPill:
         canvas = self._canvas
         canvas.delete("all")
         is_idle = self._status == "idle"
-        w = self.PILL_W_IDLE if is_idle else self.PILL_W_ACTIVE
+        width = self.PILL_W_IDLE if is_idle else self.PILL_W_ACTIVE
         badge_fill, glow, bar_color = self._PALETTE.get(self._status, self._PALETTE["idle"])
-        canvas.create_polygon(self._pill_points(4, 4, w - 4, self.PILL_H - 4, 24), smooth=True, splinesteps=32, fill="", outline=glow, width=1)
-        canvas.create_polygon(self._pill_points(8, 6, w - 8, self.PILL_H - 6, 22), smooth=True, splinesteps=32, fill="#0d1117", outline="#1e2533", width=1)
+
+        canvas.create_polygon(self._pill_points(4, 4, width - 4, self.PILL_H - 4, 24), smooth=True, splinesteps=32, fill="", outline=glow, width=1)
+        canvas.create_polygon(self._pill_points(8, 6, width - 8, self.PILL_H - 6, 22), smooth=True, splinesteps=32, fill="#0d1117", outline="#1e2533", width=1)
+
         cx, cy, r = self.BADGE_CX, self.BADGE_CY, self.BADGE_R
         canvas.create_oval(cx-r-4, cy-r-4, cx+r+4, cy+r+4, fill="", outline=glow, width=2)
         canvas.create_oval(cx-r, cy-r, cx+r, cy+r, fill=badge_fill, outline=glow, width=1)
-        canvas.create_polygon(cx+2,cy-12,cx-4,cy-1,cx+1,cy-1,cx-3,cy+12,cx+6,cy,cx+1,cy, fill=glow, outline="")
+        canvas.create_polygon(cx+2, cy-12, cx-4, cy-1, cx+1, cy-1, cx-3, cy+12, cx+6, cy, cx+1, cy, fill=glow, outline="")
+
         if not is_idle:
             if self._status in {"loading model", "transcribing"} and self._tick % 20 < 10:
                 self._draw_dots(canvas, bar_color)
@@ -195,14 +212,14 @@ class FloatingPill:
                 self._draw_waveform(canvas, bar_color)
 
     def _draw_waveform(self, canvas: tk.Canvas, color: str) -> None:
-        for i, h in enumerate(self._bar_heights):
+        for i, height in enumerate(self._bar_heights):
             x = self.WAVE_X0 + i * self.BAR_GAP
-            half = int(h) // 2
+            half = int(height) // 2
             canvas.create_rectangle(x, self.WAVE_Y-half, x+self.BAR_W, self.WAVE_Y+half, fill=color, outline="")
 
     def _draw_dots(self, canvas: tk.Canvas, color: str) -> None:
-        total_w = (self.DOT_COUNT - 1) * 28
-        x0 = self.WAVE_X0 + (self.PILL_W_ACTIVE - self.WAVE_X0 - total_w) // 2
+        total_width = (self.DOT_COUNT - 1) * 28
+        x0 = self.WAVE_X0 + (self.PILL_W_ACTIVE - self.WAVE_X0 - total_width) // 2
         for i in range(self.DOT_COUNT):
             phase = math.sin((self._tick * 0.4) - i) * 0.5 + 0.5
             offset = int(phase * 8)
@@ -221,8 +238,10 @@ class FloatingPill:
     def _drag(self, event: tk.Event) -> None:
         if not self._root or not self._drag_start:
             return
-        sx, sy = self._drag_start
-        self._root.geometry(f"+{self._root.winfo_x() + event.x_root - sx}+{self._root.winfo_y() + event.y_root - sy}")
+        start_x, start_y = self._drag_start
+        x = self._root.winfo_x() + event.x_root - start_x
+        y = self._root.winfo_y() + event.y_root - start_y
+        self._root.geometry(f"+{x}+{y}")
         self._drag_start = (event.x_root, event.y_root)
 
     def _end_drag(self, event: tk.Event) -> None:
@@ -236,7 +255,20 @@ class FloatingPill:
 
 
 class TrayApp:
-    def __init__(self, get_status: Callable[[], str], get_last_error: Callable[[], str], get_settings: Callable[[], Settings], on_open_settings: Callable[[], None], on_retry: Callable[[], None], on_clear_history: Callable[[], None], on_toggle_cleanup: Callable[[], None], on_toggle_startup: Callable[[], None], on_preload_model: Callable[[], None], on_quit: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        get_status: Callable[[], str],
+        get_last_error: Callable[[], str],
+        get_settings: Callable[[], Settings],
+        on_open_settings: Callable[[], None],
+        on_retry: Callable[[], None],
+        on_clear_history: Callable[[], None],
+        on_toggle_cleanup: Callable[[], None],
+        on_toggle_startup: Callable[[], None],
+        on_toggle_sound: Callable[[], None],
+        on_preload_model: Callable[[], None],
+        on_quit: Callable[[], None],
+    ) -> None:
         self.get_status = get_status
         self.get_last_error = get_last_error
         self.get_settings = get_settings
@@ -245,6 +277,7 @@ class TrayApp:
         self.on_clear_history = on_clear_history
         self.on_toggle_cleanup = on_toggle_cleanup
         self.on_toggle_startup = on_toggle_startup
+        self.on_toggle_sound = on_toggle_sound
         self.on_preload_model = on_preload_model
         self.on_quit = on_quit
         self.icon = pystray.Icon("Voice Prompt", self._image(), "Voice Prompt", self._menu())
@@ -271,6 +304,7 @@ class TrayApp:
             pystray.MenuItem("Warm up model", lambda icon, item: self.on_preload_model()),
             pystray.MenuItem("Retry last transcription", lambda icon, item: self.on_retry()),
             pystray.MenuItem("Clear local history", lambda icon, item: self.on_clear_history(), enabled=settings.save_history),
+            pystray.MenuItem("Sound feedback", lambda icon, item: self.on_toggle_sound(), checked=lambda item: settings.sound_feedback),
             pystray.MenuItem("Cloud cleanup", lambda icon, item: self.on_toggle_cleanup(), checked=lambda item: settings.cleanup_provider != "none"),
             pystray.MenuItem("Start on boot", lambda icon, item: self.on_toggle_startup(), checked=lambda item: settings.startup_on_boot),
         ]
@@ -320,6 +354,7 @@ class SettingsWindow:
         recording_mode = tk.StringVar(value=self.settings.recording_mode)
         input_device = tk.StringVar(value=self.settings.input_device)
         max_recording = tk.DoubleVar(value=self.settings.max_recording_seconds)
+        sound_feedback = tk.BooleanVar(value=self.settings.sound_feedback)
         startup = tk.BooleanVar(value=self.settings.startup_on_boot)
         preload = tk.BooleanVar(value=self.settings.preload_model)
         vad = tk.BooleanVar(value=self.settings.vad_filter)
@@ -332,6 +367,15 @@ class SettingsWindow:
         cpp_exe = tk.StringVar(value=self.settings.whisper_cpp_executable)
         cpp_model = tk.StringVar(value=self.settings.whisper_cpp_model)
         cpp_threads = tk.IntVar(value=self.settings.whisper_cpp_threads)
+
+        def update_cloud_model(*_args: object) -> None:
+            provider = cleanup_provider.get()
+            if provider == "gemini" and cloud_model.get() == self.settings.openrouter_model:
+                cloud_model.set(self.settings.gemini_model)
+            elif provider == "openrouter" and cloud_model.get() == self.settings.gemini_model:
+                cloud_model.set(self.settings.openrouter_model)
+
+        cleanup_provider.trace_add("write", update_cloud_model)
 
         frame = ttk.Frame(root, padding=14)
         frame.grid(row=0, column=0, sticky="nsew")
@@ -346,23 +390,37 @@ class SettingsWindow:
         self._entry(frame, "whisper.cpp exe", cpp_exe, 8)
         self._entry(frame, "whisper.cpp model", cpp_model, 9)
         self._spin(frame, "whisper.cpp threads", cpp_threads, 1, 32, 10)
-        ttk.Checkbutton(frame, text="Warm up model at startup", variable=preload).grid(row=11, column=0, columnspan=2, sticky="w")
-        ttk.Checkbutton(frame, text="Filter silence (recommended)", variable=vad).grid(row=12, column=0, columnspan=2, sticky="w")
-        ttk.Checkbutton(frame, text="Preserve clipboard after paste", variable=preserve_clipboard).grid(row=13, column=0, columnspan=2, sticky="w")
-        ttk.Checkbutton(frame, text="Return focus to original dictation window", variable=restore_focus).grid(row=14, column=0, columnspan=2, sticky="w")
-        ttk.Checkbutton(frame, text="Save transcription history locally", variable=save_history).grid(row=15, column=0, columnspan=2, sticky="w")
-        self._combo(frame, "Cloud cleanup", cleanup_provider, CLEANUP_PROVIDERS, 16)
-        self._entry(frame, "Cloud model", cloud_model, 17)
-        self._spin(frame, "Cloud timeout (s)", cleanup_timeout, 1, 15, 18)
-        ttk.Checkbutton(frame, text="Start on boot", variable=startup).grid(row=19, column=0, columnspan=2, sticky="w")
-        ttk.Label(frame, text="Dictionary replacements").grid(row=20, column=0, columnspan=2, sticky="w", pady=(10, 2))
+        ttk.Checkbutton(frame, text="Play sound when recording starts/stops", variable=sound_feedback).grid(row=11, column=0, columnspan=2, sticky="w")
+        ttk.Checkbutton(frame, text="Warm up model at startup", variable=preload).grid(row=12, column=0, columnspan=2, sticky="w")
+        ttk.Checkbutton(frame, text="Filter silence (recommended)", variable=vad).grid(row=13, column=0, columnspan=2, sticky="w")
+        ttk.Checkbutton(frame, text="Preserve clipboard after paste", variable=preserve_clipboard).grid(row=14, column=0, columnspan=2, sticky="w")
+        ttk.Checkbutton(frame, text="Return focus to original dictation window", variable=restore_focus).grid(row=15, column=0, columnspan=2, sticky="w")
+        ttk.Checkbutton(frame, text="Save transcription history locally", variable=save_history).grid(row=16, column=0, columnspan=2, sticky="w")
+        self._combo(frame, "Cloud cleanup", cleanup_provider, CLEANUP_PROVIDERS, 17)
+        self._entry(frame, "Cloud model", cloud_model, 18)
+        self._spin(frame, "Cloud timeout (s)", cleanup_timeout, 1, 15, 19)
+        ttk.Checkbutton(frame, text="Start on boot", variable=startup).grid(row=20, column=0, columnspan=2, sticky="w")
+        ttk.Label(frame, text="Dictionary replacements").grid(row=21, column=0, columnspan=2, sticky="w", pady=(10, 2))
+
         replacements = tk.Text(frame, width=48, height=7)
-        replacements.grid(row=21, column=0, columnspan=2, sticky="ew")
-        replacements.insert("1.0", "\n".join(f"{s}={t}" for s, t in self.settings.replacements.items()))
+        replacements.grid(row=22, column=0, columnspan=2, sticky="ew")
+        replacements.insert("1.0", "\n".join(f"{source}={target}" for source, target in self.settings.replacements.items()))
+
         buttons = ttk.Frame(frame)
-        buttons.grid(row=22, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        buttons.grid(row=23, column=0, columnspan=2, sticky="e", pady=(12, 0))
         ttk.Button(buttons, text="Cancel", command=root.destroy).grid(row=0, column=0, padx=(0, 8))
-        ttk.Button(buttons, text="Save", command=lambda: self._save(root, hotkey.get(), recording_mode.get(), backend.get(), model.get(), language.get(), beam_size.get(), input_device.get(), max_recording.get(), cpp_exe.get(), cpp_model.get(), cpp_threads.get(), preload.get(), vad.get(), startup.get(), cleanup_provider.get(), cloud_model.get(), cleanup_timeout.get(), preserve_clipboard.get(), restore_focus.get(), save_history.get(), replacements.get("1.0", "end"))).grid(row=0, column=1)
+        ttk.Button(
+            buttons,
+            text="Save",
+            command=lambda: self._save(
+                root,
+                hotkey.get(), recording_mode.get(), backend.get(), model.get(), language.get(), beam_size.get(),
+                input_device.get(), max_recording.get(), cpp_exe.get(), cpp_model.get(), cpp_threads.get(),
+                sound_feedback.get(), preload.get(), vad.get(), startup.get(), cleanup_provider.get(), cloud_model.get(),
+                cleanup_timeout.get(), preserve_clipboard.get(), restore_focus.get(), save_history.get(),
+                replacements.get("1.0", "end"),
+            ),
+        ).grid(row=0, column=1)
 
     @staticmethod
     def _combo(parent: ttk.Frame, label: str, variable: tk.StringVar, values: list[str], row: int) -> None:
@@ -379,7 +437,32 @@ class SettingsWindow:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=2, padx=(0, 12))
         ttk.Spinbox(parent, from_=low, to=high, textvariable=variable, width=30).grid(row=row, column=1, sticky="ew", pady=2)
 
-    def _save(self, root: tk.Toplevel, hotkey: str, recording_mode: str, backend: str, model: str, language: str, beam_size: int, input_device: str, max_recording: float, cpp_exe: str, cpp_model: str, cpp_threads: int, preload: bool, vad: bool, startup: bool, cleanup_provider: str, cloud_model: str, cleanup_timeout: float, preserve_clipboard: bool, restore_focus: bool, save_history: bool, replacements_text: str) -> None:
+    def _save(
+        self,
+        root: tk.Toplevel,
+        hotkey: str,
+        recording_mode: str,
+        backend: str,
+        model: str,
+        language: str,
+        beam_size: int,
+        input_device: str,
+        max_recording: float,
+        cpp_exe: str,
+        cpp_model: str,
+        cpp_threads: int,
+        sound_feedback: bool,
+        preload: bool,
+        vad: bool,
+        startup: bool,
+        cleanup_provider: str,
+        cloud_model: str,
+        cleanup_timeout: float,
+        preserve_clipboard: bool,
+        restore_focus: bool,
+        save_history: bool,
+        replacements_text: str,
+    ) -> None:
         replacements: dict[str, str] = {}
         for line in replacements_text.splitlines():
             if not line.strip():
@@ -393,7 +476,11 @@ class SettingsWindow:
                 replacements[source] = target
 
         provider = cleanup_provider if cleanup_provider in CLEANUP_PROVIDERS else "none"
-        model_updates = {"gemini_model": cloud_model.strip() or "gemini-2.5-flash-lite"} if provider == "gemini" else {"openrouter_model": cloud_model.strip() or "openrouter/free"}
+        model_updates = (
+            {"gemini_model": cloud_model.strip() or "gemini-2.5-flash-lite"}
+            if provider == "gemini"
+            else {"openrouter_model": cloud_model.strip() or "openrouter/free"}
+        )
         updated = replace(
             self.settings,
             hotkey=hotkey,
@@ -407,6 +494,7 @@ class SettingsWindow:
             whisper_cpp_executable=cpp_exe.strip(),
             whisper_cpp_model=cpp_model.strip(),
             whisper_cpp_threads=max(1, min(32, int(cpp_threads))),
+            sound_feedback=bool(sound_feedback),
             preload_model=preload,
             vad_filter=vad,
             startup_on_boot=startup,

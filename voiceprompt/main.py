@@ -58,6 +58,7 @@ class VoicePromptApp:
             on_clear_history=self.clear_history,
             on_toggle_cleanup=self.toggle_cleanup,
             on_toggle_startup=self.toggle_startup,
+            on_toggle_sound=self.toggle_sound,
             on_preload_model=self.preload_model,
             on_quit=self.quit,
         )
@@ -111,8 +112,8 @@ class VoicePromptApp:
             return
         self._record_target = capture_foreground_window()
         try:
-            # Play the activation cue before opening the mic so the cue itself
-            # cannot leak into the transcription.
+            # Finish the activation cue before the microphone opens so the
+            # cue itself cannot leak into transcription.
             self.sound.play_active()
             self.recorder.start()
         except Exception as exc:
@@ -125,8 +126,8 @@ class VoicePromptApp:
         target_window = self._record_target
         try:
             recording = self.recorder.stop()
-            # The microphone is fully closed at this point, so the stop cue can
-            # safely play without contaminating the captured audio.
+            # recorder.stop() includes final-phoneme grace and fully closes the
+            # microphone before this cue is played.
             self.sound.play_inactive(asynchronous=True)
         except Exception as exc:
             self._record_error(exc)
@@ -169,6 +170,9 @@ class VoicePromptApp:
             self.update_settings(replace(self.settings, cleanup_provider="none", last_cleanup_provider=provider))
         else:
             self.update_settings(replace(self.settings, cleanup_provider=self.settings.last_cleanup_provider))
+
+    def toggle_sound(self) -> None:
+        self.update_settings(replace(self.settings, sound_feedback=not self.settings.sound_feedback))
 
     def toggle_startup(self) -> None:
         self.update_settings(replace(self.settings, startup_on_boot=not self.settings.startup_on_boot))

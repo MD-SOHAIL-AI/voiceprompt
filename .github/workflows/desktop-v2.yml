@@ -39,12 +39,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
-          cache-dependency-path: desktop/package-lock.json
 
       - name: Install desktop dependencies
         working-directory: desktop
-        run: npm ci
+        run: npm install
 
       - name: Build React frontend
         working-directory: desktop

@@ -1,193 +1,144 @@
 # Voice Prompt
 
-A lightweight Windows push-to-talk voice typing app inspired by BridgeVoice, TalkType, and faster-whisper-hotkey.
-
-Workflow:
+Voice Prompt is a lightweight Windows push-to-talk dictation utility for AI prompts, coding, notes, browsers, editors, and terminals.
 
 ```text
-hold Right Ctrl -> speak -> release -> local faster-whisper transcription -> optional cloud cleanup -> paste
+hold hotkey -> activation tone -> speak -> local ASR -> release -> deactivation tone -> optional cleanup -> safe paste
 ```
 
-Normal launch:
+## Default setup
 
-```text
-Double-click Start Voice Prompt.bat
-```
+The default recognizer is now **multilingual Whisper `base`** on CPU/int8 through `faster-whisper`. Language detection is automatic unless a language is selected manually.
 
-The app is designed for Windows 10/11 laptops without a dedicated GPU. It defaults to `base.en`, CPU, `int8` inference, and a modest accuracy setting so it is still quick but more reliable than the fastest tiny model.
+For lower native-runtime overhead, Voice Prompt also supports an optional **whisper.cpp** backend. Configure the path to `whisper-cli.exe` and a compatible quantized multilingual Whisper model in Settings. `Auto` uses whisper.cpp when both paths are valid and otherwise falls back to faster-whisper.
 
-## Features
+Recommended modes for an 8 GB Windows laptop:
 
-- Global push-to-talk hotkey
-- Default hotkey: hold Right Ctrl
-- Local transcription with `faster-whisper`
-- Reuses one loaded Whisper model during the app session
-- Prevents duplicate app instances from transcribing the same recording multiple times
-- Warms the model in the background at startup by default
-- Uses dictionary terms as Whisper vocabulary hints
-- Keeps a short release grace period so final syllables are not clipped
-- Optional silence filtering to reduce hallucinations and wasted decoding
-- Clipboard paste injection into the currently focused app
-- Clipboard restore after paste when possible
-- Tiny always-on-top alive pill
-- Stable tray icon with status: idle, loading model, ready, recording, transcribing
-- Settings window for hotkey, model, language, cleanup, startup, and replacements
-- Push-to-talk mode and toggle-recording mode
-- Accuracy setting from 1 to 5
-- Local transcription history
-- Retry last transcription from the tray
-- Optional OpenRouter or Gemini cleanup, disabled by default
-- OpenRouter free-model routing with a hard timeout and local fallback
-- Custom dictionary replacements, for example `chat g p t=ChatGPT`
-- Includes vocabulary hints for Brahmshosh, Claude Code, OpenRouter, and embedded systems
+- Fast/default: `base`, multilingual, CPU/int8
+- Accuracy: `small`, multilingual, CPU/int8
+- Native/experimental: whisper.cpp with a quantized multilingual model
 
-## Project Structure
+## Recording sound feedback
 
-```text
-voiceprompt/
-  __init__.py
-  main.py
-  config.py
-  hotkeys.py
-  recorder.py
-  transcriber.py
-  injector.py
-  ui.py
-  history.py
-  cleanup.py
-  replacements.py
-  startup.py
-README.md
-requirements.txt
-.env.example
-```
+Sound feedback is enabled by default so you can use Voice Prompt without looking at the floating pill:
 
-Settings and history are stored under your Windows app config directory, usually:
+- **Hotkey activates recording:** a short ascending two-tone cue plays.
+- **Hotkey is released / recording stops:** a short descending two-tone cue plays.
+- The activation cue finishes **before the microphone opens**, so Voice Prompt does not transcribe its own notification sound.
+- The deactivation cue plays only **after the microphone is fully closed**, including the final-phoneme grace window.
+- The cues are available in both push-to-talk and toggle recording modes.
+- Sound feedback can be disabled from **Settings** or directly from the tray menu.
+- If Windows cannot play the tone, dictation continues normally; sound feedback never blocks the core workflow.
 
-```text
-%APPDATA%\Voice Prompt\
-```
+## Reliability and privacy improvements
+
+- Final-phoneme release grace is captured correctly.
+- Maximum recording duration prevents forgotten toggle recordings from consuming memory indefinitely.
+- The floating waveform is driven by real microphone RMS level.
+- Paste is tied to the window where dictation started. If the target cannot safely regain focus, automatic paste is skipped and **Retry last transcription** remains available.
+- Clipboard restoration only happens when Voice Prompt still owns the clipboard value, so a newer user copy is never overwritten.
+- Transcription history is **off by default**. It can be enabled in Settings and cleared from the tray.
+- Cloud cleanup is optional/off by default and results pass integrity checks for numbers, URLs, email addresses, and common technical tokens.
+- Disabling/re-enabling cloud cleanup remembers the previously selected provider.
+- Dictionary replacements work with punctuation-heavy technical terms such as `C++`.
+- Settings use the same Tk UI thread as the floating pill rather than creating a second Tk root on a worker thread.
+- Startup scripts prefer the project `.venv`.
 
 ## Install
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install --upgrade pip
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Optional cloud cleanup:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Then set:
-
-```text
-GEMINI_API_KEY=your_key_here
-OPENROUTER_API_KEY=your_key_here
-```
-
-Only the key for the provider you select is needed. In Settings, choose `openrouter` with
-`openrouter/free` for zero-cost model routing, or choose `gemini` and enter a Gemini model.
-Cloud cleanup is off by default and local dictation works without any API key. Free OpenRouter
-models can be rate-limited or temporarily unavailable, so Voice Prompt returns the local text
-unchanged when the request fails or exceeds the configured timeout.
-
-## Run
-
-Easy mode:
+Run:
 
 ```powershell
 .\Start Voice Prompt.bat
 ```
 
-Or run from PowerShell:
+The first run can take longer while Whisper is downloaded and cached.
+
+## Usage
+
+1. Place the cursor in the target text field.
+2. Hold **Right Ctrl**.
+3. Wait for the short rising activation cue, then speak.
+4. Release **Right Ctrl**.
+5. Hear the short falling deactivation cue.
+6. Voice Prompt transcribes locally and pastes back into the original target window.
+
+Very short accidental taps are ignored. Toggle mode is available in Settings.
+
+## Multilingual settings
+
+The default language is `auto`. Common quick choices in the UI include English (`en`), Tamil (`ta`), Hindi (`hi`), Telugu (`te`), Malayalam (`ml`), and Kannada (`kn`). The underlying multilingual Whisper model supports additional languages; `auto` is recommended for general use.
+
+## whisper.cpp backend
+
+Voice Prompt does not bundle native binaries or model weights. To use whisper.cpp:
+
+1. Build or download a Windows `whisper-cli.exe` from whisper.cpp.
+2. Obtain a compatible quantized multilingual Whisper model, preferably `base` or `small` for low-RAM laptops.
+3. Open **Voice Prompt Settings**.
+4. Set **ASR backend** to `whisper_cpp` or `auto`.
+5. Set the **whisper.cpp exe** and **whisper.cpp model** paths.
+6. Choose an appropriate thread count.
+
+If `auto` is selected and those paths are unavailable, Voice Prompt continues with faster-whisper.
+
+## Optional cloud cleanup
 
 ```powershell
-python -m voiceprompt.main
+Copy-Item .env.example .env
 ```
 
-The first run may take longer because faster-whisper downloads and caches the model. After startup:
+Then add only the key for the provider you intend to use:
 
-1. Put your cursor in Notepad, a browser, ChatGPT, VS Code, a terminal, or another text field.
-2. Hold Right Ctrl.
-3. Speak.
-4. Release Right Ctrl.
-5. The transcript is pasted at the cursor.
+```text
+GEMINI_API_KEY=
+OPENROUTER_API_KEY=
+```
 
-Use the tray icon to open settings, retry the last transcription, toggle cleanup, toggle startup on boot, or quit.
+Cloud cleanup has a hard timeout and always falls back to the local transcript on provider failure or integrity-check failure.
 
-The model warms up on a worker thread at startup so the first real dictation is faster. This can
-be disabled in Settings, and **Warm up model** remains available from the tray.
-
-The floating pill is always on top so you can see the app is alive:
-
-- gray/white: idle
-- green: ready
-- red moving bars: recording
-- blue moving bars: transcribing
-- purple moving bars: cloud cleanup
-- amber moving bars: loading the model
-
-Drag the pill anywhere on screen. Voice Prompt remembers its position.
-
-## Start on Boot
-
-Use one of these options once:
+## Start on boot
 
 ```powershell
 .\Install Voice Prompt Startup.bat
 ```
 
-Or open the tray/settings UI and enable **Start on boot**.
-
-To remove it from startup:
+Remove it with:
 
 ```powershell
 .\Uninstall Voice Prompt Startup.bat
 ```
 
-## Packaging for Windows
+## Tests
 
-Install PyInstaller:
+```powershell
+python -m unittest discover -s tests -v
+```
+
+A Windows GitHub Actions workflow runs the test suite on pushes and pull requests.
+
+## Packaging
+
+For daily Windows use, an onedir PyInstaller build is recommended:
 
 ```powershell
 pip install pyinstaller
-```
-
-Single-file build:
-
-```powershell
-pyinstaller --noconsole --name VoicePrompt --onefile --collect-all faster_whisper --collect-all ctranslate2 voiceprompt\main.py
-```
-
-Recommended folder build for faster startup:
-
-```powershell
 pyinstaller --noconsole --name VoicePrompt --onedir --collect-all faster_whisper --collect-all ctranslate2 voiceprompt\main.py
 ```
 
-The `--onedir` build is usually better for daily use because it starts faster and avoids some one-file extraction overhead.
+## Local files
 
-## Low-RAM Laptop Recommendations
+Configuration and optional transcription history are stored under the user's Windows app config directory, normally:
 
-- Keep the default model at `base.en` for better accuracy.
-- Switch to `tiny.en` only when speed matters more than recognition quality.
-- Set Accuracy to `1` for fastest transcription or `3` for the default balanced mode.
-- Keep `device=cpu` and `compute_type=int8`.
-- Keep cloud cleanup disabled for minimum latency; enable it when punctuation and correction quality matter more.
-- Use `openrouter/free` for zero-cost cleanup, but a specific fast model is more predictable when available.
-- Prefer short dictation bursts.
-- Use `small.en` only if accuracy matters more than RAM and latency.
-- Prefer PyInstaller `--onedir` over `--onefile`.
-- Keep history bounded; the default is 50 items.
-- Avoid webview/dashboard shells for the always-running app. Voice Prompt uses a small tray plus Tk settings window so long transcription work does not freeze the UI.
+```text
+%APPDATA%\Voice Prompt\
+```
 
-## Notes
-
-- This is push-to-talk only. It does not continuously listen.
-- Text injection uses clipboard paste because it works across browsers, ChatGPT, editors, terminals, and Notepad more reliably than keystroke-by-keystroke typing.
-- Very short accidental hotkey taps are ignored.
+API keys remain in `.env`, which is ignored by Git.

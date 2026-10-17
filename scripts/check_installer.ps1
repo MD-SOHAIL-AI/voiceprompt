@@ -69,6 +69,8 @@ $portable = $null
 try {
     $portable = Start-LiveSmoke (Join-Path $projectRoot 'dist\VoicePrompt\VoicePrompt.exe') 'portable-uninstall-control'
     foreach ($scenario in @('installer-startup', 'runtime-startup')) {
+        # Reproduce empty folders inherited from a failed older uninstall.
+        New-Item -ItemType Directory -Force -Path (Join-Path $target '_internal\orphan\empty') | Out-Null
         $startupTask = if ($scenario -eq 'installer-startup') { 'startup' } else { '!startup' }
         foreach ($pass in 1,2) {
             $process = Start-Process -FilePath $installerPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $target + '"'),('/MERGETASKS=desktopicon,' + $startupTask)) -WindowStyle Hidden -Wait -PassThru

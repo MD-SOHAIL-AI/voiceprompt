@@ -37,6 +37,10 @@ Name: startup; Description: "Start VoicePrompt after Windows sign-in"; Flags: un
 [Files]
 Source: "{#RepoRoot}\dist\VoicePrompt\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Dirs]
+Name: "{app}"; Flags: uninsalwaysuninstall
+Name: "{app}\_internal"; Flags: uninsalwaysuninstall
+
 [Icons]
 Name: "{group}\VoicePrompt"; Filename: "{app}\VoicePrompt.exe"
 Name: "{autodesktop}\VoicePrompt"; Filename: "{app}\VoicePrompt.exe"; Tasks: desktopicon
@@ -57,6 +61,8 @@ function SetEvent(Event: THandle): Boolean;
   external 'SetEvent@kernel32.dll stdcall';
 function CloseHandle(Handle: THandle): Boolean;
   external 'CloseHandle@kernel32.dll stdcall';
+function GetBundleAttributes(Path: String): LongWord;
+  external 'GetFileAttributesW@kernel32.dll stdcall';
 
 function InstalledProcesses(Wmi: Variant): Variant;
 var
@@ -149,6 +155,27 @@ begin
     Result := 'VoicePrompt is still running. Quit it from the tray, then try again.';
 end;
 
+procedure RemoveEmptyBundleDirectories(Path: String);
+var
+  Entry: TFindRec;
+begin
+  if (GetBundleAttributes(Path) and $400) <> 0 then Exit;
+  if FindFirst(AddBackslash(Path) + '*', Entry) then begin
+    try
+      repeat
+        if (Entry.Name <> '.') and (Entry.Name <> '..') and
+           ((Entry.Attributes and $10) <> 0) and
+           ((Entry.Attributes and $400) = 0) then
+          RemoveEmptyBundleDirectories(AddBackslash(Path) + Entry.Name);
+      until not FindNext(Entry);
+    finally
+      FindClose(Entry);
+    end;
+  end;
+  { RemoveDir only removes empty directories; never follow junctions or delete files. }
+  if RemoveDir(Path) then Log('Removed empty bundle directory: ' + Path);
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then begin
@@ -159,8 +186,13 @@ begin
     RemoveStartupEntry('Voice Prompt');
     RemoveStartupEntry('Prompt Voice');
   end;
-  if (CurUninstallStep = usPostUninstall) and FileExists(ExpandConstant('{app}\VoicePrompt.exe')) then
-    RaiseException('VoicePrompt.exe could not be removed. Close VoicePrompt and run Uninstall again.');
+  if CurUninstallStep = usPostUninstall then begin
+    if FileExists(ExpandConstant('{app}\VoicePrompt.exe')) then
+      RaiseException('VoicePrompt.exe could not be removed. Close VoicePrompt and run Uninstall again.');
+    { A failed older uninstall can leave directories that predate this install. }
+    RemoveEmptyBundleDirectories(ExpandConstant('{app}\_internal'));
+    RemoveDir(ExpandConstant('{app}'));
+  end;
   { Only installed files are removed. Source code, saved data and shared model
     caches are preserved; do not recursively delete the app folder or a profile. }
 end;

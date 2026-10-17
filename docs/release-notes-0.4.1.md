@@ -10,6 +10,8 @@ This unsigned Windows x64 preview fixes uninstalling while VoicePrompt is runnin
   including the historical `Voice Prompt` and `Prompt Voice` names when their
   commands launch VoicePrompt. Unrelated commands are preserved.
 - Keeps settings, history, tasks, dictionary, model caches, and developer source.
+- Removes empty library directories inherited from a failed older uninstall;
+  custom files are preserved and directory junctions are not followed.
 - Adds automated live-uninstall checks with a running app and speech worker,
   installed and runtime startup registration, shortcuts and saved-data preservation.
 

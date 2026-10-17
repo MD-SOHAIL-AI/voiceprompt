@@ -44,6 +44,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
-        run: gh release create $env:GITHUB_REF_NAME release/* --draft --prerelease --title "VoicePrompt $env:GITHUB_REF_NAME preview" --notes-file docs/release-notes-0.4.0.md
+        run: |
+          gh release view $env:GITHUB_REF_NAME --json url 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Output 'This release already exists. Keeping its assets and publication status unchanged.'
+            exit 0
+          }
+          gh release create $env:GITHUB_REF_NAME release/* --draft --prerelease --title "VoicePrompt $env:GITHUB_REF_NAME preview" --notes-file docs/release-notes-0.4.0.md
     permissions:
       contents: write

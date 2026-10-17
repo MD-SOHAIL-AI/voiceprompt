@@ -43,6 +43,13 @@ class DesktopTests(unittest.TestCase):
         self.window.advanced_toggle.click()
         self.assertTrue(self.window.advanced.isVisible())
 
+    def test_installer_shutdown_quits_instead_of_hiding_in_tray(self):
+        self.controller.shutdown_requested = lambda: True
+        with patch.object(self.window, "refresh") as refresh:
+            self.host.poll()
+        self.controller.quit.assert_called_once()
+        refresh.assert_not_called()
+
     def test_tasks_and_ninety_minute_timer_use_existing_services(self):
         self.window.quick_task.setText("Study DSA")
         self.window.add_quick_task()

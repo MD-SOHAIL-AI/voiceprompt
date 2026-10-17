@@ -60,3 +60,22 @@ uninstallation, and preservation of the pre-existing startup registration.
 Release scripts record these results under build/ and CI retains them as artifacts.
 The local installer check
 does not substitute for the clean-machine and physical-device checks above.
+
+## 0.4.1 uninstall regression
+
+The 0.4.0 uninstaller was reproduced on this Windows machine with the desktop
+and its speech worker running. It returned exit code 0 while both processes and
+the executable remained. Its log reported locked native files and `Removed all?
+No`. Keeping the source directory was unrelated to this failure.
+
+The 0.4.1 build passes 139 regression checks (12 retired Tk checks are skipped)
+and frozen checks for all four speech engines and RNNoise. The expanded installer
+check passes installation and reinstallation, followed by uninstall with a live
+app and speech worker, for both installer-enabled and runtime-enabled startup.
+Both runs received the normal shutdown request and removed the installation
+folder, shortcuts and Windows registration. Legacy startup commands were removed,
+an unrelated startup command and a separate running portable copy survived, and
+a saved-data marker was unchanged. The installation path contains spaces and an
+apostrophe to exercise process-path quoting. Logs report `Removed all? Yes`
+without requesting a restart. Evidence is recorded in `build/installer-check.json`
+and `build/uninstall-*.log`.

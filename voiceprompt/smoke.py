@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 
-def run(output):
+def run(output, hold_for_uninstall=False):
     from PySide6 import __version__ as qt_version
     from PySide6.QtWidgets import QApplication, QWidget
     from voiceprompt import __version__
@@ -30,4 +30,24 @@ def run(output):
         checks["rnnoise"] = False
     Path(output).write_text(json.dumps(checks, indent=2), encoding="utf-8")
     widget.close()
+    if hold_for_uninstall:
+        # Exercise uninstall with a real frozen process, loaded native libraries
+        # and a live speech child, without touching a microphone or personal data.
+        from PySide6.QtCore import QTimer
+        from voiceprompt.instance import ShutdownRequest
+        with ShutdownRequest() as shutdown:
+            backend = ManagedTranscriber(Settings(backend="whisper"))
+            try:
+                backend._start()
+                backend._exchange("describe", timeout=60)
+                checks["holding_for_uninstall"] = True
+                Path(output).write_text(json.dumps(checks, indent=2), encoding="utf-8")
+                timer = QTimer()
+                timer.timeout.connect(lambda: app.quit() if shutdown.requested() else None)
+                timer.start(100)
+                app.exec()
+                checks["shutdown_received"] = shutdown.requested()
+            finally:
+                backend.close()
+            Path(output).write_text(json.dumps(checks, indent=2), encoding="utf-8")
     return checks

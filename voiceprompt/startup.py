@@ -8,6 +8,7 @@ from pathlib import Path
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 APP_NAME = "VoicePrompt"
 LEGACY_APP_NAME = "Voice Prompt"
+LEGACY_APP_NAMES = (LEGACY_APP_NAME, "Prompt Voice")
 
 
 def executable_command() -> str:
@@ -27,7 +28,7 @@ def executable_command() -> str:
 
 
 def set_startup(enabled: bool) -> None:
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
         if enabled:
             winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, executable_command())
         else:
@@ -35,16 +36,17 @@ def set_startup(enabled: bool) -> None:
                 winreg.DeleteValue(key, APP_NAME)
             except FileNotFoundError:
                 pass
-        try:
-            winreg.DeleteValue(key, LEGACY_APP_NAME)
-        except FileNotFoundError:
-            pass
+        for name in LEGACY_APP_NAMES:
+            try:
+                winreg.DeleteValue(key, name)
+            except FileNotFoundError:
+                pass
 
 
 def startup_enabled() -> bool:
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_READ) as key:
-            for name in (APP_NAME, LEGACY_APP_NAME):
+            for name in (APP_NAME, *LEGACY_APP_NAMES):
                 try:
                     winreg.QueryValueEx(key, name)
                     return True

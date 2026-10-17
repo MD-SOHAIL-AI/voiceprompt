@@ -14,7 +14,7 @@ from voiceprompt.config import Settings, config_dir, history_path, load_settings
 from voiceprompt.diagnostics import Diagnostics
 from voiceprompt.history import TranscriptionHistory
 from voiceprompt.hotkeys import PushToTalkHotkey
-from voiceprompt.instance import SingleInstance
+from voiceprompt.instance import ShutdownRequest, SingleInstance
 from voiceprompt.injector import TextInjector
 from voiceprompt.recorder import PushToTalkRecorder, RecorderConfig
 from voiceprompt.replacements import apply_replacements
@@ -55,6 +55,7 @@ class VoicePromptApp:
         self._working = False
         self._ready = False
         self._quitting = False
+        self.shutdown_requested = lambda: False
         self._current_id = 0
         self._session: DictationSession | None = None
         self._pending_settings: Settings | None = None
@@ -600,12 +601,14 @@ def main() -> None:
     with SingleInstance() as instance:
         if instance.already_running:
             return
-        app = VoicePromptApp(preload_model=args.preload)
-        try:
-            app.run()
-        finally:
-            app.quit()
-            app._executor.shutdown(wait=True)
+        with ShutdownRequest() as shutdown:
+            app = VoicePromptApp(preload_model=args.preload)
+            app.shutdown_requested = shutdown.requested
+            try:
+                app.run()
+            finally:
+                app.quit()
+                app._executor.shutdown(wait=True)
 
 
 if __name__ == "__main__":

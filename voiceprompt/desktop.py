@@ -957,6 +957,9 @@ class DesktopHost:
         self.app.exec()
 
     def poll(self):
+        if not self.controller._quitting and getattr(self.controller, "shutdown_requested", lambda: False)():
+            self.controller.quit()
+            return
         while True:
             try:
                 self.adapter.events.get_nowait()()

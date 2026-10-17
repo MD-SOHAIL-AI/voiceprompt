@@ -35,7 +35,7 @@ try {
         & $InnoCompiler packaging\VoicePrompt.iss
         if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
         if ($SignThumbprint) {
-            & signtool sign /sha1 $SignThumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 release\VoicePrompt-Setup-0.4.0-x64.exe
+            & signtool sign /sha1 $SignThumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 release\VoicePrompt-Setup-0.4.1-x64.exe
             if ($LASTEXITCODE -ne 0) { throw 'Installer signing failed' }
         }
     }

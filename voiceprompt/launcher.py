@@ -3,10 +3,10 @@ import sys
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] == "--smoke-test":
+    if len(sys.argv) in (3, 4) and sys.argv[1] == "--smoke-test":
         try:
             from voiceprompt.smoke import run
-            run(sys.argv[2])
+            run(sys.argv[2], hold_for_uninstall=len(sys.argv) == 4 and sys.argv[3] == "--hold-for-uninstall")
         except Exception:
             import json
             import traceback

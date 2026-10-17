@@ -14,6 +14,12 @@ Build on Windows; do not copy a Python virtual environment to users.
 4. Inspect `build/frozen-smoke.json`. Every selected backend must describe itself;
    the release also includes the optional RNNoise native library.
 5. The installer and its `.sha256` file appear under `release/`.
+6. Run `scripts/check_installer.ps1` in a clean Windows account. It installs and
+   reinstalls with startup enabled and disabled, then uninstalls with a live
+   frozen app and speech worker. It checks normal shutdown, all installed files,
+   shortcuts, Windows registration, runtime and legacy startup cleanup, unrelated
+   startup preservation, and a saved-data marker. Original startup values are
+   restored after the test. Evidence is in `build/installer-check.json` and logs.
 
 The folder bundle remains under `dist/VoicePrompt`. It includes the interpreter,
 native dependencies, Qt plugins, notices, and assets; model weights remain separate.
@@ -50,7 +56,8 @@ Use a Windows 10/11 x64 VM without Python. Verify:
   every control. In long settings forms, scroll to Save and use keyboard navigation.
 - Install over an earlier version. Preserve settings, dictionary, history, SQLite
   tasks/timers, credentials, and cached models. Check migration backups.
-- Uninstall. Remove executable shortcuts and startup registration, preserve user data,
+- Uninstall while the tray app and speech model are running. Remove the executable,
+  its workers, shortcuts and startup registration, preserve user data,
   then reinstall and confirm recovery.
 
 Automated replay and offscreen UI tests complement these checks; they do not prove
@@ -68,7 +75,7 @@ Main-branch pushes alone do not publish a release.
 For a local build, create a draft release using the checked artifact and checksum:
 
 ```powershell
-gh release create v0.4.0-preview.1 release/VoicePrompt-Setup-0.4.0-x64.exe release/VoicePrompt-Setup-0.4.0-x64.exe.sha256 --repo MD-SOHAIL-AI/voiceprompt --draft --prerelease --title "VoicePrompt 0.4.0 preview" --notes-file docs/release-notes-0.4.0.md
+gh release create v0.4.1-preview.1 release/VoicePrompt-Setup-0.4.1-x64.exe release/VoicePrompt-Setup-0.4.1-x64.exe.sha256 --repo MD-SOHAIL-AI/voiceprompt --draft --prerelease --title "VoicePrompt 0.4.1 preview" --notes-file docs/release-notes-0.4.1.md
 ```
 
 Users download from the repository's Releases page. The in-app update action opens

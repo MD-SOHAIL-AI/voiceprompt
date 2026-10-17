@@ -29,16 +29,18 @@ jobs:
       - name: Build app, check workers, and compile installer
         shell: pwsh
         run: ./scripts/build_windows.ps1 -Python python -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-      - name: Verify installer, reinstall, workers, and uninstall
+      - name: Verify installer, live uninstall, startup cleanup, and saved data
         shell: pwsh
         run: ./scripts/check_installer.ps1
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: VoicePrompt-windows-x64
           path: |
             release/*
             build/frozen-smoke.json
             build/installer-check.json
+            build/uninstall-*.log
       - name: Prepare draft release
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -50,6 +52,6 @@ jobs:
             Write-Output 'This release already exists. Keeping its assets and publication status unchanged.'
             exit 0
           }
-          gh release create $env:GITHUB_REF_NAME release/* --draft --prerelease --title "VoicePrompt $env:GITHUB_REF_NAME preview" --notes-file docs/release-notes-0.4.0.md
+          gh release create $env:GITHUB_REF_NAME release/VoicePrompt-Setup-0.4.1-x64.exe release/VoicePrompt-Setup-0.4.1-x64.exe.sha256 --draft --prerelease --title "VoicePrompt $env:GITHUB_REF_NAME preview" --notes-file docs/release-notes-0.4.1.md
     permissions:
       contents: write

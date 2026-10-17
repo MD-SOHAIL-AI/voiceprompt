@@ -1,0 +1,43 @@
+name: Windows app
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: requirements-lock.txt
+      - name: Install locked dependencies
+        run: python -m pip install -r requirements-lock.txt
+      - name: Run regression checks
+        run: python -m unittest discover -s tests -v
+      - name: Build app, check workers, and compile installer
+        shell: pwsh
+        run: ./scripts/build_windows.ps1 -Python python -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoicePrompt-windows-x64
+          path: |
+            release/*
+            build/frozen-smoke.json
+      - name: Prepare draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: gh release create $env:GITHUB_REF_NAME release/* --draft --prerelease --title "VoicePrompt $env:GITHUB_REF_NAME preview" --notes-file docs/release-notes-0.4.0.md
+    permissions:
+      contents: write

@@ -1,4 +1,2 @@
 @echo off
-cd /d "%~dp0"
-python -c "from voiceprompt.startup import set_startup; set_startup(True); print('Voice Prompt will start automatically on login.')"
-pause
+call "%~dp0Install VoicePrompt Startup.bat"

@@ -1,193 +1,88 @@
-# Voice Prompt
+# VoicePrompt
 
-A lightweight Windows push-to-talk voice typing app inspired by BridgeVoice, TalkType, and faster-whisper-hotkey.
+Local voice typing and daily focus tools for Windows 10/11 x64.
 
-Workflow:
+Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete recording and pastes the text once. Speech recognition runs locally; optional cloud text cleanup is off by default.
 
-```text
-hold Right Ctrl -> speak -> release -> local faster-whisper transcription -> optional cloud cleanup -> paste
-```
+## Download and install
 
-Normal launch:
+Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
-```text
-Double-click Start Voice Prompt.bat
-```
+The 0.4.0 build is a preview. An unsigned preview is labelled in its release notes; signing support is included in the build script. Models download separately on first preparation. Setup shows progress and supports cancellation and retry; cached models work offline.
 
-The app is designed for Windows 10/11 laptops without a dedicated GPU. It defaults to `base.en`, CPU, `int8` inference, and a modest accuracy setting so it is still quick but more reliable than the fastest tiny model.
+## Voice typing
 
-## Features
+1. Choose a microphone, use **Check microphone**, then select **Prepare model and microphone**.
+2. Wait for **Ready to dictate**.
+3. Put the cursor in the destination application.
+4. Hold Right Ctrl, speak, and release. Settings also offers press-to-start/stop mode and alternative keys.
+5. The final text appears at the cursor and in VoicePrompt. If the active window changed, use **Copy text** to choose the destination yourself.
 
-- Global push-to-talk hotkey
-- Default hotkey: hold Right Ctrl
-- Local transcription with `faster-whisper`
-- Reuses one loaded Whisper model during the app session
-- Prevents duplicate app instances from transcribing the same recording multiple times
-- Warms the model in the background at startup by default
-- Uses dictionary terms as Whisper vocabulary hints
-- Keeps a short release grace period so final syllables are not clipped
-- Optional silence filtering to reduce hallucinations and wasted decoding
-- Clipboard paste injection into the currently focused app
-- Clipboard restore after paste when possible
-- Tiny always-on-top alive pill
-- Stable tray icon with status: idle, loading model, ready, recording, transcribing
-- Settings window for hotkey, model, language, cleanup, startup, and replacements
-- Push-to-talk mode and toggle-recording mode
-- Accuracy setting from 1 to 5
-- Local transcription history
-- Retry last transcription from the tray
-- Optional OpenRouter or Gemini cleanup, disabled by default
-- OpenRouter free-model routing with a hard timeout and local fallback
-- Custom dictionary replacements, for example `chat g p t=ChatGPT`
-- Includes vocabulary hints for Brahmshosh, Claude Code, OpenRouter, and embedded systems
+Recordings support five minutes, with an elapsed timer and a warning during the last ten seconds. A 180 ms release tail preserves final syllables. When recognition falls behind, capture continues and the indicator says it is catching up. Microphone failures, recognition timeouts, and duration limits have explicit messages.
 
-## Project Structure
+Failed recognition can be retried from memory. This audio is cleared when recovered, discarded, replaced by another recording, or on exit; it is never automatically written to disk. Audio with microphone frame drops is never pasted as a complete recording. Cancel ends the session without inserting text.
 
-```text
-voiceprompt/
-  __init__.py
-  main.py
-  config.py
-  hotkeys.py
-  recorder.py
-  transcriber.py
-  injector.py
-  ui.py
-  history.py
-  cleanup.py
-  replacements.py
-  startup.py
-README.md
-requirements.txt
-.env.example
-```
+## What is included
 
-Settings and history are stored under your Windows app config directory, usually:
+- Dictation, local transcript history, custom dictionary, microphone setup, tray, and a floating status indicator.
+- Existing Whisper, Moonshine, Parakeet, and Nemotron recognition options. New profiles use Whisper base.en on CPU; existing choices are preserved.
+- Tasks with notes and reminders; activity timers of any duration; configurable Pomodoro cycles.
+- One-time and repeating alarms, dismiss/snooze reminders, and a pending-reminders inbox.
+- Codeforces, LeetCode, CodeChef, and AtCoder contest schedules. Codeforces needs no key; other platforms use your CLIST credentials through **Contests → Connect CLIST**.
+- Settings for sounds, startup, clipboard restoration, history limits, and optional OpenRouter/Gemini text cleanup.
 
-```text
-%APPDATA%\Voice Prompt\
-```
+Timers and planner data work offline. Alarm delivery requires VoicePrompt to be running and Windows awake. Closing the main window keeps the tray running. Choose **Quit** from the tray or app menu to exit.
 
-## Install
+## Data and privacy
+
+Settings, history, planner data, runtime caches, and bounded diagnostics live under `%LOCALAPPDATA%\VoicePrompt`. Existing data stays in place; configuration migration and the first desktop planner upgrade create backups. Uninstall preserves user data and cached models.
+
+Audio remains local. Enabling cloud cleanup explicitly sends completed transcript text to the selected provider. Cleanup and CLIST keys use Windows Credential Manager, separate from JSON settings and SQLite. Source launches also support the environment variables documented in `.env.example`; never include a real `.env` in a release.
+
+History contains transcript text on this device. Set its limit to zero to disable future persistence, or use **Clear history**. Diagnostic metrics contain timestamps, duration, backlog, stop reason, engine, and outcome, without transcript text or audio. No telemetry is uploaded automatically.
+
+## Run from source
+
+Use 64-bit Python 3.10 on Windows for the validated build environment:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install --upgrade pip
-pip install -r requirements.txt
+.\.venv\Scripts\python -m pip install -r requirements-lock.txt
+.\Start VoicePrompt.bat
 ```
 
-Optional cloud cleanup:
+The normal runtime dependencies are in `requirements.txt`. `requirements-noise.txt` enables optional RNNoise; keep it disabled unless it improves your recognition results. The lock file records the tested Windows build environment.
+
+## Structure
+
+- **Presentation:** `desktop.py` uses PySide6/Qt Widgets; `ui.py` provides thread-safe controller adapters. Legacy Tk screens remain as reference source and regression tests, and are excluded from the packaged app.
+- **Controller:** `main.py` owns session lifecycle, settings, insertion, and recovery. Shared states and stop reasons live in `state.py`.
+- **Audio and recognition:** `recorder.py`, `session.py`, and `backend_process.py` separate capture from potentially slow recognition. One persistent, isolated process owns the selected model.
+- **Services:** existing planner, contest, history, credentials, and storage modules retain their data formats.
+- **Release:** `packaging/` defines the bundle and installer; `scripts/build_windows.ps1` builds and validates them. CI prepares draft previews from version tags.
+
+## Test and build
 
 ```powershell
-Copy-Item .env.example .env
+.\.venv\Scripts\python -m unittest discover -s tests -v
+.\.venv\Scripts\python scripts/preview_desktop.py
+.\scripts\build_windows.ps1
 ```
 
-Then set:
+The build script needs Inno Setup 6, either under `.tools\inno` or supplied with `-InnoCompiler`. Supply `-SignThumbprint` with your certificate identity and Windows SDK signtool to sign the application and installer. Outputs go to `release/`, including SHA-256 checksums. See [release instructions](docs/releasing.md) for publishing and clean-machine acceptance.
 
-```text
-GEMINI_API_KEY=your_key_here
-OPENROUTER_API_KEY=your_key_here
-```
+The build self-check loads Qt and launches each speech worker without accessing personal settings, microphone, hooks, or model downloads. It verifies packaging, rather than speech accuracy.
 
-Only the key for the provider you select is needed. In Settings, choose `openrouter` with
-`openrouter/free` for zero-cost model routing, or choose `gemini` and enter a Gemini model.
-Cloud cleanup is off by default and local dictation works without any API key. Free OpenRouter
-models can be rate-limited or temporarily unavailable, so Voice Prompt returns the local text
-unchanged when the request fails or exceeds the configured timeout.
-
-## Run
-
-Easy mode:
+For a five-minute offline endurance replay of bundled licensed public speech:
 
 ```powershell
-.\Start Voice Prompt.bat
+.\.venv\Scripts\python scripts/verify_endurance.py --seconds 300 --backend nemotron
 ```
 
-Or run from PowerShell:
+This requires the selected model/runtime to be cached. It measures replay performance, not physical-key handling, microphone capture, clipboard delivery, or recognition accuracy.
 
-```powershell
-python -m voiceprompt.main
-```
+## Earlier measurements and licensing
 
-The first run may take longer because faster-whisper downloads and caches the model. After startup:
+The [performance review](docs/performance-review.md), [Nemotron implementation](docs/nemotron-upgrade.md), [Parakeet implementation](docs/parakeet-upgrade.md), and [model comparison](docs/model-comparison-2026-10.md) document the earlier pipeline and laptop measurements. Their two-second-queue and Tk descriptions are historical; this README describes the current app.
 
-1. Put your cursor in Notepad, a browser, ChatGPT, VS Code, a terminal, or another text field.
-2. Hold Right Ctrl.
-3. Speak.
-4. Release Right Ctrl.
-5. The transcript is pasted at the cursor.
-
-Use the tray icon to open settings, retry the last transcription, toggle cleanup, toggle startup on boot, or quit.
-
-The model warms up on a worker thread at startup so the first real dictation is faster. This can
-be disabled in Settings, and **Warm up model** remains available from the tray.
-
-The floating pill is always on top so you can see the app is alive:
-
-- gray/white: idle
-- green: ready
-- red moving bars: recording
-- blue moving bars: transcribing
-- purple moving bars: cloud cleanup
-- amber moving bars: loading the model
-
-Drag the pill anywhere on screen. Voice Prompt remembers its position.
-
-## Start on Boot
-
-Use one of these options once:
-
-```powershell
-.\Install Voice Prompt Startup.bat
-```
-
-Or open the tray/settings UI and enable **Start on boot**.
-
-To remove it from startup:
-
-```powershell
-.\Uninstall Voice Prompt Startup.bat
-```
-
-## Packaging for Windows
-
-Install PyInstaller:
-
-```powershell
-pip install pyinstaller
-```
-
-Single-file build:
-
-```powershell
-pyinstaller --noconsole --name VoicePrompt --onefile --collect-all faster_whisper --collect-all ctranslate2 voiceprompt\main.py
-```
-
-Recommended folder build for faster startup:
-
-```powershell
-pyinstaller --noconsole --name VoicePrompt --onedir --collect-all faster_whisper --collect-all ctranslate2 voiceprompt\main.py
-```
-
-The `--onedir` build is usually better for daily use because it starts faster and avoids some one-file extraction overhead.
-
-## Low-RAM Laptop Recommendations
-
-- Keep the default model at `base.en` for better accuracy.
-- Switch to `tiny.en` only when speed matters more than recognition quality.
-- Set Accuracy to `1` for fastest transcription or `3` for the default balanced mode.
-- Keep `device=cpu` and `compute_type=int8`.
-- Keep cloud cleanup disabled for minimum latency; enable it when punctuation and correction quality matter more.
-- Use `openrouter/free` for zero-cost cleanup, but a specific fast model is more predictable when available.
-- Prefer short dictation bursts.
-- Use `small.en` only if accuracy matters more than RAM and latency.
-- Prefer PyInstaller `--onedir` over `--onefile`.
-- Keep history bounded; the default is 50 items.
-- Avoid webview/dashboard shells for the always-running app. Voice Prompt uses a small tray plus Tk settings window so long transcription work does not freeze the UI.
-
-## Notes
-
-- This is push-to-talk only. It does not continuously listen.
-- Text injection uses clipboard paste because it works across browsers, ChatGPT, editors, terminals, and Notepad more reliably than keystroke-by-keystroke typing.
-- Very short accidental hotkey taps are ignored.
+Application code is [MIT licensed](LICENSE). Dependencies and model weights retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md) and the licenses directory in packaged builds.

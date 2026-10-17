@@ -6,20 +6,22 @@ from pathlib import Path
 
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-APP_NAME = "Voice Prompt"
+APP_NAME = "VoicePrompt"
+LEGACY_APP_NAME = "Voice Prompt"
 
 
 def executable_command() -> str:
     exe = Path(sys.executable)
     if exe.name.lower() in {"python.exe", "pythonw.exe"}:
-        pythonw = exe.with_name("pythonw.exe")
-        launcher = pythonw if pythonw.exists() else exe
         project_root = Path(__file__).resolve().parent.parent
+        local_python = project_root / ".venv" / "Scripts" / "pythonw.exe"
+        pythonw = local_python if local_python.exists() else exe.with_name("pythonw.exe")
+        launcher = pythonw if pythonw.exists() else exe
         root_arg = str(project_root).replace("'", "''")
         launcher_arg = str(launcher).replace("'", "''")
         return (
             'powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass '
-            f'-Command "Set-Location -LiteralPath \'{root_arg}\'; & \'{launcher_arg}\' -m voiceprompt.main"'
+            f'-Command "Set-Location -LiteralPath \'{root_arg}\'; & \'{launcher_arg}\' -m voiceprompt.launcher"'
         )
     return f'"{exe}"'
 
@@ -33,12 +35,21 @@ def set_startup(enabled: bool) -> None:
                 winreg.DeleteValue(key, APP_NAME)
             except FileNotFoundError:
                 pass
+        try:
+            winreg.DeleteValue(key, LEGACY_APP_NAME)
+        except FileNotFoundError:
+            pass
 
 
 def startup_enabled() -> bool:
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_READ) as key:
-            winreg.QueryValueEx(key, APP_NAME)
-            return True
+            for name in (APP_NAME, LEGACY_APP_NAME):
+                try:
+                    winreg.QueryValueEx(key, name)
+                    return True
+                except FileNotFoundError:
+                    pass
+            return False
     except FileNotFoundError:
         return False

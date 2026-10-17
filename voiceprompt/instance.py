@@ -9,7 +9,7 @@ ERROR_ALREADY_EXISTS = 183
 
 
 class SingleInstance:
-    """Keeps one Voice Prompt process active per Windows login session."""
+    """Keeps one VoicePrompt process active per Windows login session."""
 
     def __init__(self, name: str = "Local\\VoicePrompt.SingleInstance") -> None:
         self._handle: int | None = None

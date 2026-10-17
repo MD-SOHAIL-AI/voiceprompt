@@ -18,3 +18,9 @@ publisher. Code-signing credentials are not included in the project. Installer
 and clean-machine acceptance checks must be reviewed before promoting a preview
 to a stable release. Windows 10/11 x64 is the first target; other platforms are
 not packaged in this release.
+
+Validation: 146 local regression checks, a five-minute Nemotron CPU public-speech
+replay without overflow, frozen worker checks, and a local install/reinstall/
+uninstall cycle. The replay finalized in approximately 1.03 seconds after release.
+Physical microphone/keyboard, screen-reader, and clean Windows 10/11 VM checks
+remain outstanding; see docs/desktop-validation.md and docs/releasing.md.

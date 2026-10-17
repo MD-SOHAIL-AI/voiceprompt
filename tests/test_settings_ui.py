@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import os
 import unittest
 from tkinter import ttk
 from unittest.mock import patch
@@ -9,6 +10,7 @@ from voiceprompt.config import Settings
 from voiceprompt.settings_ui import SettingsWindow
 
 
+@unittest.skipIf(os.environ.get("VOICEPROMPT_TEST_LEGACY_TK") == "0", "Reference Tk screens are excluded from the Qt release")
 class SettingsUITests(unittest.TestCase):
     def test_settings_use_own_tcl_variables_with_floating_pill_root_present(self):
         try:

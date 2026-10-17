@@ -23,16 +23,22 @@ jobs:
       - name: Install locked dependencies
         run: python -m pip install -r requirements-lock.txt
       - name: Run regression checks
+        env:
+          VOICEPROMPT_TEST_LEGACY_TK: '0'
         run: python -m unittest discover -s tests -v
       - name: Build app, check workers, and compile installer
         shell: pwsh
         run: ./scripts/build_windows.ps1 -Python python -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+      - name: Verify installer, reinstall, workers, and uninstall
+        shell: pwsh
+        run: ./scripts/check_installer.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: VoicePrompt-windows-x64
           path: |
             release/*
             build/frozen-smoke.json
+            build/installer-check.json
       - name: Prepare draft release
         if: startsWith(github.ref, 'refs/tags/')
         env:

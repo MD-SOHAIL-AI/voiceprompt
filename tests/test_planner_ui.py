@@ -4,6 +4,7 @@ import ctypes
 import sys
 import tempfile
 import tkinter as tk
+import os
 import unittest
 from pathlib import Path
 from tkinter import ttk
@@ -13,6 +14,7 @@ from voiceprompt.planner import PlannerService
 from voiceprompt.planner_ui import PlannerUI
 
 
+@unittest.skipIf(os.environ.get("VOICEPROMPT_TEST_LEGACY_TK") == "0", "Reference Tk screens are excluded from the Qt release")
 class PlannerUITests(unittest.TestCase):
     def setUp(self):
         try:

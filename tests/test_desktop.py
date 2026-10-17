@@ -91,3 +91,12 @@ class DesktopTests(unittest.TestCase):
         self.window.refresh(force=True)
         self.assertEqual(self.window.tables["History"].rowCount(), 1)
         self.assertEqual(self.window.tables["History"].item(0, 1).text(), "test words")
+
+    def test_pages_fit_minimum_window_width_without_horizontal_scrolling(self):
+        self.window.resize(800, 560)
+        for page in PAGES:
+            with self.subTest(page=page):
+                self.window.show_page(page)
+                self.app.processEvents()
+                scroll = self.window.stack.currentWidget()
+                self.assertEqual(scroll.horizontalScrollBar().maximum(), 0)

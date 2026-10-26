@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.4.1"
+  #define AppVersion "0.5.0"
 #endif
 #define RepoRoot AddBackslash(SourcePath) + ".."
 
@@ -66,12 +66,15 @@ function GetBundleAttributes(Path: String): LongWord;
 
 function InstalledProcesses(Wmi: Variant): Variant;
 var
-  Path: String;
+  Path, EnginePath: String;
 begin
   Path := ExpandConstant('{app}\VoicePrompt.exe');
   StringChangeEx(Path, '\', '\\', True);
   StringChangeEx(Path, '''', '\''', True);
-  Result := Wmi.ExecQuery('SELECT * FROM Win32_Process WHERE ExecutablePath = ''' + Path + '''');
+  EnginePath := ExpandConstant('{app}\engine\VoicePromptEngine.exe');
+  StringChangeEx(EnginePath, '\', '\\', True);
+  StringChangeEx(EnginePath, '''', '\''', True);
+  Result := Wmi.ExecQuery('SELECT * FROM Win32_Process WHERE ExecutablePath = ''' + Path + ''' OR ExecutablePath = ''' + EnginePath + '''');
 end;
 
 function StopInstalledProcesses: Boolean;

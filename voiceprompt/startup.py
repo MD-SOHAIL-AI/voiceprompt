@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import os
 import winreg
 from pathlib import Path
 
@@ -12,6 +13,11 @@ LEGACY_APP_NAMES = (LEGACY_APP_NAME, "Prompt Voice")
 
 
 def executable_command() -> str:
+    desktop = os.environ.get("VOICEPROMPT_DESKTOP_EXE", "")
+    if desktop:
+        path = Path(desktop)
+        if path.is_absolute() and path.name.lower() == "voiceprompt.exe" and path.is_file():
+            return f'"{path}"'
     exe = Path(sys.executable)
     if exe.name.lower() in {"python.exe", "pythonw.exe"}:
         project_root = Path(__file__).resolve().parent.parent

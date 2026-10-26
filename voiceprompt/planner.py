@@ -51,11 +51,12 @@ def next_alarm(after: float, hour: int, minute: int, weekdays: list[int], zone: 
 class PlannerService:
     """Independent scheduler. Its lock covers short DB work, never a network request."""
 
-    def __init__(self, path: Path, *, now=time.time, monotonic=time.monotonic, credentials=None):
+    def __init__(self, path: Path, *, now=time.time, monotonic=time.monotonic, credentials=None, network_enabled=True):
         self.store = PlannerStore(path)
         self._lock = self.store.lock
         self.now, self.monotonic = now, monotonic
         self.credentials = credentials or ClistCredentials()
+        self.network_enabled = network_enabled
         self._stop = threading.Event()
         self._thread = None
         self._network = ThreadPoolExecutor(max_workers=1, thread_name_prefix="contest-sync")
@@ -70,6 +71,13 @@ class PlannerService:
         with self.store.transaction():
             if self.store.get("preferences", "preferences") is None:
                 self.store.put("preferences", dict(DEFAULT_PREFERENCES))
+            if self.store.get("delivery", "version") is None:
+                # Existing reminders stay actionable; upgrading must not sound
+                # every old reminder as if it had just arrived.
+                for item in self.store.all("notification"):
+                    item.update(sound_count=3, presented_revision=item.get("revision", 0))
+                    self.store.put("notification", item)
+                self.store.put("delivery", {"id": "version", "version": 1})
         timer = self.store.get("timer", "active")
         if timer and timer["status"] == "running":
             self._deadline = self.monotonic() + timer["ends_at"] - self.now()
@@ -188,11 +196,15 @@ class PlannerService:
             self._deadline = self.monotonic() + seconds
             self._recovered_timer = False
 
-    def timer_action(self, action: str) -> None:
+    def timer_action(self, action: str, *, expected_session: str | None = None) -> None:
         with self.store.transaction():
             timer = self.store.get("timer", "active")
             if not timer:
                 return
+            if expected_session is not None and timer["session"] != expected_session:
+                raise ValueError("This timer changed. Refresh before trying again.")
+            if action not in {"pause", "resume", "restart", "cancel"}:
+                raise ValueError("Unsupported timer action.")
             if action == "pause" and timer["status"] == "running":
                 timer["remaining"] = max(0, self._deadline - self.monotonic())
                 timer["status"] = "paused"
@@ -212,7 +224,7 @@ class PlannerService:
                 self._dismiss_related("timer", timer["session"])
             self.store.put("timer", timer)
 
-    def save_alarm(self, title: str, due: float, weekdays: list[int] | None = None, item_id=None) -> str:
+    def save_alarm(self, title: str, due: float, weekdays: list[int] | None = None, item_id=None, *, enabled: bool | None = None) -> str:
         if not math.isfinite(due) or due <= self.now():
             raise ValueError("Choose an alarm time in the future.")
         weekdays = sorted(set(weekdays or []))
@@ -225,6 +237,8 @@ class PlannerService:
         alarm = {"id": item_id or uuid.uuid4().hex, "title": self._title(title), "due": due,
                  "weekdays": weekdays, "hour": local.hour, "minute": local.minute, "timezone": zone, "enabled": True}
         with self.store.transaction():
+            old = self.store.get("alarm", alarm["id"])
+            alarm["enabled"] = enabled if isinstance(enabled, bool) else (old["enabled"] if old else True)
             self._dismiss_related("alarm", alarm["id"])
             self.store.put("alarm", alarm)
         return alarm["id"]
@@ -243,14 +257,49 @@ class PlannerService:
                 self._dismiss_related("alarm", item_id)
             self.store.put("alarm", alarm)
 
-    def acknowledge(self, item_id: str, snooze: bool = False) -> None:
+    def acknowledge(self, item_id: str, snooze: bool = False, *, expected_revision: int | None = None) -> None:
         with self.store.transaction():
             item = self.store.get("notification", item_id)
             if item:
+                if expected_revision is not None and item.get("revision", 0) != expected_revision:
+                    raise ValueError("This reminder changed. Refresh before trying again.")
+                if item.get("dismissed"):
+                    return
                 item["dismissed"] = not snooze
-                item["due"] = self.now() + 300 if snooze else item["due"]
+                item["due"] = min(self.now() + 300, item.get("expires") or float("inf")) if snooze else item["due"]
                 item["revision"] = item.get("revision", 0) + 1
+                item["sound_count"] = 0
+                item["last_sound"] = 0
+                item["presented_revision"] = -1
                 self.store.put("notification", item)
+
+    def mark_presented(self, item_id: str, revision: int) -> None:
+        with self.store.transaction():
+            item = self.store.get("notification", item_id)
+            if item and item.get("revision", 0) == revision:
+                item["presented_revision"] = revision
+                self.store.put("notification", item)
+
+    def claim_reminder_sound(self) -> bool:
+        """Persist bounded delivery attempts so restarts do not replay alerts."""
+        now = self.now()
+        with self.store.transaction():
+            delivery = self.store.get("delivery", "sound") or {"id": "sound", "last": 0}
+            if now - delivery["last"] < 10:
+                return False
+            due = []
+            for item in self.store.all("notification"):
+                maximum = 3 if item.get("owner", "").startswith(("alarm:", "timer:")) else 1
+                if not item["dismissed"] and item["due"] <= now and (not item.get("expires") or item["expires"] > now) and item.get("sound_count", 0) < maximum:
+                    due.append(item)
+            if not due:
+                return False
+            for item in due:
+                item["sound_count"] = item.get("sound_count", 0) + 1
+                item["last_sound"] = now
+                self.store.put("notification", item)
+            self.store.put("delivery", {"id": "sound", "last": now})
+            return bool(self.preferences()["reminder_sound"])
 
     def _notify(self, item_id: str, title: str, detail: str, *, owner="", url="", expires=None) -> None:
         if self.store.get("notification", item_id) is None:
@@ -320,9 +369,18 @@ class PlannerService:
         prefs = self.preferences()
         contests = [c for c in self.store.all("contest") if c["platform"] in prefs["platforms"] and not c.get("muted") and c["end"] > now]
         for contest in contests:
-            if contest["start"] - prefs["contest_minutes"] * 60 <= now:
-                detail = "Contest has started" if contest["start"] <= now else f"Starts in {max(1, math.ceil((contest['start'] - now) / 60))} minutes"
-                self._notify(f"contest:{contest['id']}:{contest['start']}", contest["name"], f"{PLATFORMS[contest['platform']]} · {detail}",
+            legacy_id = f"contest:{contest['id']}:{contest['start']}"
+            if contest["start"] <= now:
+                # Replace the advance reminder when the start stage becomes due.
+                # A restart after the start produces just the current stage.
+                advance = self.store.get("notification", legacy_id)
+                if advance and not advance["dismissed"]:
+                    advance["dismissed"] = True
+                    self.store.put("notification", advance)
+                self._notify(legacy_id + ":started", contest["name"], f"{PLATFORMS[contest['platform']]} · Contest has started",
+                             owner=f"contest:{contest['id']}", url=contest["url"], expires=contest["end"])
+            elif contest["start"] - prefs["contest_minutes"] * 60 <= now:
+                self._notify(legacy_id, contest["name"], f"{PLATFORMS[contest['platform']]} · Starts soon",
                              owner=f"contest:{contest['id']}", url=contest["url"], expires=contest["end"])
         local = datetime.fromtimestamp(now, ZoneInfo(prefs["timezone"]))
         if prefs["daily_summary"] and local.hour >= prefs["summary_hour"]:
@@ -343,7 +401,7 @@ class PlannerService:
 
     def refresh_contests(self, force=False) -> bool:
         with self._lock:
-            if self._stop.is_set() or self._syncing:
+            if not self.network_enabled or self._stop.is_set() or self._syncing:
                 return False
             sources = [s for s in self._next_refresh if self.monotonic() >= self._next_refresh[s]]
             # Manual refresh observes a minimum interval too, protecting provider quotas.

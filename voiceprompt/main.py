@@ -5,6 +5,7 @@ import copy
 import threading
 import time
 import traceback
+import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
@@ -25,16 +26,16 @@ from voiceprompt.ui import FloatingPill, TrayApp
 from voiceprompt.worker import AudioWorkerContext
 from voiceprompt.planner import PlannerService
 from voiceprompt.state import SessionState, StopReason
-from voiceprompt.windows import foreground_window, modifiers_down
+from voiceprompt.windows import foreground_window, modifiers_down, is_voiceprompt_window
 from voiceprompt.sounds import SoundFeedback
 
 
 class VoicePromptApp:
     """One worker owns model/capture operations; hotkey callbacks only signal work."""
 
-    def __init__(self, preload_model: bool | None = None) -> None:
+    def __init__(self, preload_model: bool | None = None, *, presentation=None) -> None:
         self.settings = load_settings()
-        self.settings.startup_on_boot = startup_enabled()
+        self.settings.startup_on_boot = startup_enabled() if not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") else False
         if self.settings.startup_on_boot:
             set_startup(True)  # Refresh an existing startup entry to use the local environment.
         save_settings(self.settings)
@@ -42,6 +43,7 @@ class VoicePromptApp:
         self.last_error = ""
         self.detail = "Prepare your microphone and model to begin."
         self.latest_text = ""
+        self.insertion_status = "none"
         self.elapsed_seconds = 0.0
         self.backlog_seconds = 0.0
         self.download_progress = {}
@@ -62,7 +64,7 @@ class VoicePromptApp:
         self.sounds = SoundFeedback()
         self._planner_error = ""
         try:
-            self.planner = PlannerService(config_dir() / "planner.sqlite3")
+            self.planner = PlannerService(config_dir() / "planner.sqlite3", network_enabled=not bool(os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR")))
         except Exception as exc:
             # A corrupt or unavailable optional Planner must not prevent voice typing.
             self.planner = None
@@ -76,13 +78,14 @@ class VoicePromptApp:
         self.latest_text = self.history.last()
         self.diagnostics = Diagnostics(config_dir())
         self.hotkey = self._new_hotkey(self.settings)
-        self.pill = FloatingPill(
+        pill_factory, tray_factory = presentation or (FloatingPill, TrayApp)
+        self.pill = pill_factory(
             get_settings=lambda: self.settings, on_open_settings=self.open_settings,
             on_retry=self.retry_last, on_quit=self.quit, on_moved=self.update_pill_position,
             on_planner=self.open_planner, on_root_ready=self._planner_root_ready,
             controller=self,
         )
-        self.tray = TrayApp(
+        self.tray = tray_factory(
             get_status=self.get_status, get_last_error=lambda: self.last_error,
             get_settings=lambda: self.settings, on_settings_saved=self.update_settings,
             on_retry=self.retry_last, on_toggle_cleanup=self.toggle_cleanup,
@@ -238,9 +241,12 @@ class VoicePromptApp:
             sid = self._begin_work()
             self.last_error = ""
             self._failed_audio = None
+            self.insertion_status = "pending"
             self.elapsed_seconds = self.backlog_seconds = 0.0
             session = DictationSession(sid)
             session.target_window = foreground_window()
+            if is_voiceprompt_window(session.target_window):
+                session.target_window = 0
             self._session = session
             self.sounds.stop()  # Do not capture a reminder that was already playing.
             settings = copy.deepcopy(self.settings)
@@ -300,16 +306,19 @@ class VoicePromptApp:
                 with self._control:
                     if self._quitting or session.cancel.is_set() or sid != self._current_id:
                         return
-                    if not session.target_window or foreground_window() == session.target_window:
+                    if session.target_window and foreground_window() == session.target_window:
                         pasted_at = self.injector.inject(text)
                         session.metrics["release_to_paste_seconds"] = pasted_at - session.released_at
                         outcome = "pasted"
+                        self.insertion_status = "pasted"
                         self.detail = "Text pasted. Hold your recording key to dictate again."
                     else:
                         outcome = "text"
+                        self.insertion_status = "copy"
                         self.detail = "Text ready. The active window changed; use Copy to insert it where you want."
             else:
                 outcome = "text" if text.strip() else "empty"
+                self.insertion_status = "copy" if text.strip() else "none"
                 self.detail = "Text ready to copy." if text.strip() else "No speech detected. Check your microphone and try again."
             self.last_error = ""
             if session.stop_reason == StopReason.DURATION_LIMIT:
@@ -422,6 +431,7 @@ class VoicePromptApp:
             with self._control:
                 if not self._quitting and sid == self._current_id and not session.cancel.is_set():
                     self.latest_text = text
+                    self.insertion_status = "copy" if text.strip() else "none"
                     if text.strip():
                         self.history.add(text, duration, self.transcriber.backend_name)
                     self._failed_audio = None

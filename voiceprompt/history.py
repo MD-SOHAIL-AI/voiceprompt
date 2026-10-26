@@ -7,6 +7,8 @@ from pathlib import Path
 
 
 import uuid
+import hashlib
+import math
 
 @dataclass(frozen=True)
 class HistoryItem:
@@ -44,7 +46,15 @@ class TranscriptionHistory:
         temporary.replace(self.path)
 
     def clear(self):
-        self.path.write_text("[]", encoding="utf-8")
+        self._write([])
+
+    def _write(self, items):
+        temporary = self.path.with_suffix(".tmp")
+        temporary.write_text(json.dumps([asdict(item) for item in items], ensure_ascii=False, allow_nan=False), encoding="utf-8")
+        temporary.replace(self.path)
+
+    def delete(self, item_id: str):
+        self._write([item for item in self.load() if item.id != item_id])
 
     def last(self) -> str:
         items = self.load()
@@ -61,12 +71,14 @@ class TranscriptionHistory:
         if not isinstance(data, list):
             return []
         loaded_items = []
-        for item in data:
+        for index, item in enumerate(data):
             if not isinstance(item, dict) or not str(item.get("text", "")).strip():
                 continue
             try:
                 duration = max(0.0, float(item.get("duration_seconds", 0.0)))
             except (TypeError, ValueError):
+                duration = 0.0
+            if not math.isfinite(duration):
                 duration = 0.0
             loaded_items.append(
                 HistoryItem(
@@ -74,7 +86,7 @@ class TranscriptionHistory:
                     created_at=str(item.get("created_at", "")),
                     duration_seconds=duration,
                     source=str(item.get("source", "local")),
-                    id=str(item.get("id", uuid.uuid4().hex)),
+                    id=str(item.get("id") or hashlib.sha256(f"{index}:{item.get('created_at', '')}:{item.get('text', '')}".encode()).hexdigest()[:32]),
                 )
             )
         return loaded_items

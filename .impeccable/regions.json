@@ -1,0 +1,307 @@
+{
+  "regions": [
+    {
+      "id": "rail",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 0,
+        "y": 0,
+        "w": 264,
+        "h": 1053
+      },
+      "container": true,
+      "note": "Forest sidebar containing brand and seven navigation controls"
+    },
+    {
+      "id": "workspace",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 264,
+        "y": 0,
+        "w": 1229,
+        "h": 1053
+      },
+      "container": true,
+      "note": "Solid-color application work area containing standard UI components",
+      "codeDrawn": true
+    },
+    {
+      "id": "brand",
+      "kind": "text",
+      "pixelBox": {
+        "x": 72,
+        "y": 44,
+        "w": 153,
+        "h": 24
+      },
+      "note": "VoicePrompt brand name in Segoe UI"
+    },
+    {
+      "id": "page-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 296,
+        "y": 72,
+        "w": 222,
+        "h": 42
+      },
+      "note": "Dictation page title, white semibold Segoe UI"
+    },
+    {
+      "id": "engine-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1161,
+        "y": 82,
+        "w": 280,
+        "h": 25
+      },
+      "note": "Whisper base.en on-device engine description"
+    },
+    {
+      "id": "recording-panel",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 292,
+        "y": 138,
+        "w": 1175,
+        "h": 322
+      },
+      "container": true,
+      "note": "Bordered recording controls and live microphone meter"
+    },
+    {
+      "id": "listening-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 350,
+        "y": 164,
+        "w": 139,
+        "h": 26
+      },
+      "note": "Listening state label"
+    },
+    {
+      "id": "timer-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1337,
+        "y": 165,
+        "w": 108,
+        "h": 25
+      },
+      "note": "Recording elapsed time and five-minute limit"
+    },
+    {
+      "id": "live-meter",
+      "kind": "control",
+      "pixelBox": {
+        "x": 322,
+        "y": 219,
+        "w": 1122,
+        "h": 79
+      },
+      "note": "Live microphone data visualization with countable rectangular bars",
+      "codeDrawn": true
+    },
+    {
+      "id": "shortcut-copy",
+      "kind": "text",
+      "pixelBox": {
+        "x": 324,
+        "y": 327,
+        "w": 553,
+        "h": 26
+      },
+      "note": "Hold Right Ctrl to speak. Release to paste."
+    },
+    {
+      "id": "microphone",
+      "kind": "control",
+      "pixelBox": {
+        "x": 320,
+        "y": 383,
+        "w": 382,
+        "h": 51
+      },
+      "note": "Windows default microphone selector"
+    },
+    {
+      "id": "finish",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1120,
+        "y": 383,
+        "w": 194,
+        "h": 51
+      },
+      "note": "Mint Finish recording action"
+    },
+    {
+      "id": "cancel",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1330,
+        "y": 383,
+        "w": 111,
+        "h": 51
+      },
+      "note": "Secondary Cancel recording action"
+    },
+    {
+      "id": "transcript-panel",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 292,
+        "y": 484,
+        "w": 1175,
+        "h": 325
+      },
+      "container": true,
+      "note": "Latest transcript panel with editable text, contextual warning and copy controls"
+    },
+    {
+      "id": "transcript-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 320,
+        "y": 509,
+        "w": 195,
+        "h": 22
+      },
+      "note": "Latest transcript heading"
+    },
+    {
+      "id": "transcript-text",
+      "kind": "text",
+      "pixelBox": {
+        "x": 342,
+        "y": 564,
+        "w": 1090,
+        "h": 27
+      },
+      "note": "Sample latest transcript, replaced with actual recognition in production"
+    },
+    {
+      "id": "focus-warning",
+      "kind": "control",
+      "pixelBox": {
+        "x": 320,
+        "y": 660,
+        "w": 1121,
+        "h": 52
+      },
+      "note": "Amber conditional focus-change warning; not shown when destination stays unchanged"
+    },
+    {
+      "id": "copy",
+      "kind": "control",
+      "pixelBox": {
+        "x": 320,
+        "y": 730,
+        "w": 134,
+        "h": 56
+      },
+      "note": "Mint Copy action"
+    },
+    {
+      "id": "history",
+      "kind": "control",
+      "pixelBox": {
+        "x": 471,
+        "y": 730,
+        "w": 205,
+        "h": 56
+      },
+      "note": "Secondary Open history action"
+    },
+    {
+      "id": "island",
+      "kind": "control",
+      "pixelBox": {
+        "x": 730,
+        "y": 960,
+        "w": 160,
+        "h": 52
+      },
+      "note": "Compact live microphone island; accepted later refinement sets collapsed dimensions to 112 by 32 logical pixels"
+    },
+    {
+      "id": "nav-0",
+      "kind": "control",
+      "pixelBox": {
+        "x": 14,
+        "y": 106,
+        "w": 237,
+        "h": 49
+      },
+      "note": "Dictation navigation control"
+    },
+    {
+      "id": "nav-1",
+      "kind": "control",
+      "pixelBox": {
+        "x": 14,
+        "y": 163,
+        "w": 237,
+        "h": 49
+      },
+      "note": "History navigation control"
+    },
+    {
+      "id": "nav-2",
+      "kind": "control",
+      "pixelBox": {
+        "x": 14,
+        "y": 220,
+        "w": 237,
+        "h": 49
+      },
+      "note": "Tasks navigation control"
+    },
+    {
+      "id": "nav-3",
+      "kind": "control",
+      "pixelBox": {
+        "x": 14,
+        "y": 277,
+        "w": 237,
+        "h": 49
+      },
+      "note": "Focus timer navigation control"
+    },
+    {
+      "id": "nav-4",
+      "kind": "control",
+      "pixelBox": {
+        "x": 14,
+        "y": 334,
+        "w": 237,
+        "h": 49
+      },
+      "note": "Alarms navigation control"
+    },
+    {
+      "id": "nav-5",
+      "kind": "control",
+      "pixelBox": {
+        "x": 14,
+        "y": 391,
+        "w": 237,
+        "h": 49
+      },
+      "note": "Contests navigation control"
+    },
+    {
+      "id": "nav-settings",
+      "kind": "control",
+      "pixelBox": {
+        "x": 14,
+        "y": 969,
+        "w": 237,
+        "h": 51
+      },
+      "note": "Settings navigation control"
+    }
+  ]
+}

@@ -11,12 +11,13 @@ BUILD = ROOT / "build"
 BUILD.mkdir(exist_ok=True)
 image = Image.new("RGBA", (256, 256))
 draw = ImageDraw.Draw(image)
-draw.rounded_rectangle((4, 4, 252, 252), radius=56, fill="#285D46")
-draw.rounded_rectangle((104, 52, 152, 144), radius=24, fill="white")
-draw.arc((80, 92, 176, 176), 0, 180, fill="white", width=12)
-draw.line((128, 176, 128, 204), fill="white", width=12)
-draw.line((100, 204, 156, 204), fill="white", width=12)
+draw.rounded_rectangle((4, 4, 252, 252), radius=56, fill="#172A20")
+for x, height in zip((62, 95, 128, 161, 194), (56, 112, 160, 96, 44)):
+    draw.rounded_rectangle((x - 5, 128 - height // 2, x + 5, 128 + height // 2), radius=5, fill="#8BD0AF")
 image.save(BUILD / "VoicePrompt.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+native_icons = ROOT / 'desktop/src-tauri/icons'
+native_icons.mkdir(parents=True, exist_ok=True)
+shutil.copy2(BUILD / 'VoicePrompt.ico', native_icons / 'icon.ico')
 
 licenses = BUILD / "licenses"
 licenses.mkdir(exist_ok=True)

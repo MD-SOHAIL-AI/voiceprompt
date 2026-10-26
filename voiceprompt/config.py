@@ -63,6 +63,13 @@ class Settings:
 
 
 def config_dir() -> Path:
+    acceptance = os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR")
+    if acceptance:
+        path = Path(acceptance)
+        if not path.is_absolute():
+            raise ValueError("The isolated acceptance directory must be absolute.")
+        path.mkdir(parents=True, exist_ok=True)
+        return path
     path = Path(user_config_dir(APP_NAME, appauthor=False))
     path.mkdir(parents=True, exist_ok=True)
     # The early public build used a spaced application name. Copy its files,
@@ -85,7 +92,8 @@ def history_path() -> Path:
 
 
 def load_settings() -> Settings:
-    load_dotenv()
+    if not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
+        load_dotenv()
     path = config_path()
     if not path.exists():
         settings = Settings()
@@ -171,15 +179,21 @@ def save_settings(settings: Settings) -> None:
 
 
 def gemini_api_key() -> str:
+    if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
+        return ""
     load_dotenv()
     return _provider_key("gemini", "GEMINI_API_KEY")
 
 
 def openrouter_api_key() -> str:
+    if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
+        return ""
     load_dotenv()
     return _provider_key("openrouter", "OPENROUTER_API_KEY")
 
 
 def _provider_key(provider, variable):
+    if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
+        return ""
     from voiceprompt.credentials import get_key
     return get_key(provider) or os.getenv(variable, "").strip()

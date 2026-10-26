@@ -47,11 +47,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release view $env:GITHUB_REF_NAME --json url 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Output 'This release already exists. Keeping its assets and publication status unchanged.'
-            exit 0
+          $installer = 'release/VoicePrompt-Setup-0.4.1-x64.exe'
+          $checksum = "$installer.sha256"
+          if (-not (Test-Path -LiteralPath $installer) -or -not (Test-Path -LiteralPath $checksum)) {
+            throw 'Both the validated installer and its SHA-256 file are required for a release.'
           }
-          gh release create $env:GITHUB_REF_NAME release/VoicePrompt-Setup-0.4.1-x64.exe release/VoicePrompt-Setup-0.4.1-x64.exe.sha256 --draft --prerelease --title "VoicePrompt $env:GITHUB_REF_NAME preview" --notes-file docs/release-notes-0.4.1.md
+          $tag = $env:GITHUB_REF_NAME
+          $release = gh release view $tag --json isDraft --jq '.isDraft' 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if ($release.Trim() -ne 'true') {
+              Write-Output 'Existing release is published; refusing to modify its assets automatically.'
+              exit 0
+            }
+            # A prior interrupted CI run may have uploaded only the checksum.
+            # Repair draft assets without changing its publication status.
+            gh release upload $tag $installer $checksum --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Could not repair draft release assets.' }
+            Write-Output 'Draft release installer and checksum are present.'
+          }
+          else {
+            gh release create $tag $installer $checksum --draft --prerelease --title "VoicePrompt $tag preview" --notes-file docs/release-notes-0.4.1.md
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
+          }
     permissions:
       contents: write

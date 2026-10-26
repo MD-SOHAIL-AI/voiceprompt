@@ -19,15 +19,17 @@ class TextInjector:
             return time.perf_counter()
 
         previous: str | None = None
-        if self.preserve_clipboard:
-            try:
-                previous = pyperclip.paste()
-            except pyperclip.PyperclipException:
-                previous = None
-
         with self._lock:
+            # Snapshot and replacement must be one transaction: overlapping
+            # injections otherwise save another dictation as the user's clipboard.
             self._generation += 1
             generation = self._generation
+            if self.preserve_clipboard:
+                try:
+                    previous = pyperclip.paste()
+                except pyperclip.PyperclipException:
+                    previous = None
+
             pyperclip.copy(text)
             time.sleep(0.04)
             paste_shortcut()

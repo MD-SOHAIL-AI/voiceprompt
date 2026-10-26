@@ -99,6 +99,7 @@ class CloudCleanup:
     def _get_gemini_client(self) -> genai.Client:
         if self._gemini_client is None:
             from google import genai
+            from google.genai import types
 
             self._gemini_client = genai.Client(
                 api_key=gemini_api_key(),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from threading import Thread as RealThread
 from unittest.mock import patch
 
 from voiceprompt.injector import TextInjector
@@ -28,14 +29,17 @@ class InjectorTests(unittest.TestCase):
 
         # The competing caller begins while the first paste has the lock.
         competitor = None
-        def paste_first():
-            nonlocal competitor
-            competitor = threading.Thread(target=competing_injection)
-            competitor.start()
-            self.assertTrue(started.wait(1))
-            self.assertFalse(finished.is_set())
+        calls = 0
+        def paste_action():
+            nonlocal competitor, calls
+            calls += 1
+            if calls == 1:
+                competitor = RealThread(target=competing_injection)
+                competitor.start()
+                self.assertTrue(started.wait(1))
+                self.assertFalse(finished.is_set())
 
-        paste.side_effect = [paste_first, lambda: None]
+        paste.side_effect = paste_action
         injector.inject("first")
         competitor.join(timeout=2)
         self.assertTrue(finished.is_set())

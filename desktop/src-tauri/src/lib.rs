@@ -339,7 +339,7 @@ async fn restart_engine(app: AppHandle, state: State<'_, DesktopState>) -> Resul
     let replacement = spawn_engine(&app)?;
     *state.engine.lock().map_err(|_| "Engine unavailable.")? = Some(replacement);
     app.emit("engine-restarted", ())
-        .map_err(|_| "Cannot reconnect the interface.")
+        .map_err(|_| "Cannot reconnect the interface.".to_string())
 }
 
 #[tauri::command]

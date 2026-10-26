@@ -36,6 +36,7 @@ Name: startup; Description: "Start VoicePrompt after Windows sign-in"; Flags: un
 
 [Files]
 Source: "{#RepoRoot}\dist\VoicePrompt\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#RepoRoot}\build\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 
 [Dirs]
 Name: "{app}"; Flags: uninsalwaysuninstall
@@ -151,9 +152,39 @@ begin
   end;
 end;
 
+function HasWebViewRuntime: Boolean;
+var
+  Key, Version: String;
+begin
+  { Microsoft documents both per-machine (32-bit registry view) and per-user
+    Evergreen installations. A browser installation alone is not sufficient. }
+  Key := 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  Result := (RegQueryStringValue(HKLM32, Key, 'pv', Version) or
+             RegQueryStringValue(HKCU32, Key, 'pv', Version)) and
+            (Version <> '') and (Version <> '0.0.0.0');
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExitCode: Integer;
 begin
   Result := '';
+  if not HasWebViewRuntime then begin
+    if not WizardSilent then
+      if MsgBox('VoicePrompt needs Microsoft WebView2 to display its interface. Install the Microsoft runtime now? This requires an internet connection.', mbConfirmation, MB_YESNO) <> IDYES then begin
+        Result := 'Install Microsoft WebView2 Runtime from https://developer.microsoft.com/microsoft-edge/webview2/ and run Setup again.';
+        Exit;
+      end;
+    ExtractTemporaryFile('MicrosoftEdgeWebview2Setup.exe');
+    if not Exec(ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe'), '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then begin
+      Result := 'Microsoft WebView2 could not start. Install it from the Microsoft WebView2 website, then retry Setup.';
+      Exit;
+    end;
+    if not HasWebViewRuntime then begin
+      Result := 'Microsoft WebView2 is not available yet. Check your connection, finish the Microsoft runtime installation, then retry Setup.';
+      Exit;
+    end;
+  end;
   if not StopInstalledProcesses then
     Result := 'VoicePrompt is still running. Quit it from the tray, then try again.';
 end;

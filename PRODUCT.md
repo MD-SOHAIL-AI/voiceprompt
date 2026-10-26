@@ -4,8 +4,10 @@
 
 ## Platform
 
-Windows desktop, implemented with Python and PySide6/Qt Widgets. This is a native utility,
-not a website or a mobile application.
+Windows desktop utility with a Tauri 2 shell, React/TypeScript presentation and
+an isolated Python speech/planner engine. The browser preview is explicit sample
+data; packaged windows use the real local engine. The previous Qt interface is
+available only through the explicit legacy source launcher.
 
 ## Users and purpose
 

@@ -2,12 +2,16 @@ name: Windows app
 
 on:
   push:
-    branches: [main, feat/voiceprompt-desktop-redesign]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: windows-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   regressions:
@@ -34,7 +38,9 @@ jobs:
       - name: Engine, storage, transport and recording regressions
         env:
           VOICEPROMPT_TEST_LEGACY_TK: '0'
-        run: python -m unittest discover -s tests -v
+        run: |
+          python -m unittest discover -s tests -v
+          python scripts/check_engine_bridge.py
       - name: Frontend checks
         working-directory: desktop
         run: |
@@ -74,6 +80,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: desktop/src-tauri -> target
+          cache-on-failure: true
       - name: Install tested Python dependencies
         run: python -m pip install -r requirements-lock.txt
       - name: Build Tauri, frozen engine and per-user installer
@@ -83,6 +90,8 @@ jobs:
         run: |
           cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --lib
           cargo clippy --manifest-path desktop/src-tauri/Cargo.toml --locked -- -D warnings
+      - name: Verify frozen engine persistence and protocol
+        run: python scripts/check_engine_bridge.py --engine dist/VoicePrompt/engine/VoicePromptEngine.exe
       - name: Verify actual native bridge and floating controls
         shell: pwsh
         run: ./scripts/check_native.ps1 -Python python
@@ -98,6 +107,7 @@ jobs:
             release/*
             dist/VoicePrompt/**
             build/frozen-smoke.json
+            build/frozen-bridge.json
             build/installer-check.json
             build/native-checks.json
             build/native-*.log

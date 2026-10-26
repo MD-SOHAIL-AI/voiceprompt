@@ -551,8 +551,9 @@ class VoicePromptApp:
             if settings.hotkey != old.hotkey:
                 self.hotkey.stop()
                 self.hotkey = self._new_hotkey(settings)
-                self.hotkey.start()
-            if settings.preload_model or self._ready:
+                if not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
+                    self.hotkey.start()
+            if (settings.preload_model or self._ready) and not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
                 self._prepare()
             self.last_error = ""
         except Exception as exc:

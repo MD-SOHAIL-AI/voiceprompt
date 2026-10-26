@@ -113,6 +113,8 @@ class DesktopService:
 
     def dispatch(self, method, params):
         app = self.app
+        if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") and method in {"prepare", "microphone.check", "record.start", "record.retry"}:
+            raise ValueError("Microphone capture and speech preparation are disabled in an isolated verification profile.")
         if method == "bootstrap":
             from voiceprompt.config import gemini_api_key, openrouter_api_key
             return {"version": PROTOCOL_VERSION, "settings": asdict(app.settings), "runtime": self.runtime(),
@@ -260,7 +262,14 @@ def main():
     from voiceprompt.main import VoicePromptApp
     from voiceprompt.instance import SingleInstance
     writer = Writer(protocol_out)
-    with SingleInstance() as instance:
+    acceptance = os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR")
+    if acceptance:
+        import hashlib
+        identity = hashlib.sha256(str(Path(acceptance).resolve()).encode()).hexdigest()[:20]
+        instance_guard = SingleInstance(name="Local\\VoicePrompt.Acceptance." + identity)
+    else:
+        instance_guard = SingleInstance()
+    with instance_guard as instance:
         if instance.already_running:
             writer.event("fatal", {"message": "VoicePrompt is already running. Quit the other instance first."})
             return 1

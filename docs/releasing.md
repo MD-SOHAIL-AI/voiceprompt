@@ -2,9 +2,15 @@
 
 ## Validated target
 
-Windows x64, Python 3.10, PySide6 Essentials 6.10.3, PyInstaller 6.22.3, Inno Setup 6.
+Windows x64, Python 3.10, Node 24, Rust stable/MSVC with a Windows SDK,
+Microsoft WebView2 Runtime, PyInstaller 6.22.3 and Inno Setup 6.
 The source lock file records the tested environment, including optional RNNoise.
 Build on Windows; do not copy a Python virtual environment to users.
+The complete installer build downloads the official Microsoft WebView2 bootstrapper
+and verifies its Microsoft Authenticode signature before packaging it. Setup offers
+the runtime only when absent. That first runtime installation needs internet;
+offline machines can preinstall Microsoft's Evergreen Standalone Runtime.
+See [Microsoft's deployment guidance](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution).
 
 ## Local release
 
@@ -22,7 +28,8 @@ Build on Windows; do not copy a Python virtual environment to users.
    restored after the test. Evidence is in `build/installer-check.json` and logs.
 
 The folder bundle remains under `dist/VoicePrompt`. It includes the interpreter,
-native dependencies, Qt plugins, notices, and assets; model weights remain separate.
+native dependencies, the Tauri executable, frozen Python engine, notices and
+local font assets; Qt is excluded and model weights remain separate.
 
 ## Signing
 
@@ -68,9 +75,10 @@ physical microphone/keyboard behavior or compatibility with every destination ap
 Target repository: https://github.com/MD-SOHAIL-AI/voiceprompt
 
 CI tests pull requests and main, builds the installer, and uploads artifacts.
-A `v*` tag creates a **draft prerelease** with installer assets. Review the test
-evidence, signing status, notices, and release notes before publishing that draft.
-Main-branch pushes alone do not publish a release.
+It does not create or publish releases. Review native bridge, frozen worker,
+installer and manual acceptance evidence, signing status, notices and release
+notes before a separately authorized publication. Main-branch pushes do not
+publish a release.
 
 For a local build, create a draft release using the checked artifact and checksum:
 

@@ -53,6 +53,14 @@ try {
     if ($checks.error -or -not $checks.tauri -or @($checks.workers.PSObject.Properties).Count -ne 4 -or -not $checks.rnnoise) { throw 'Frozen checks did not verify Tauri and all speech workers' }
     New-Item -ItemType Directory -Force -Path release | Out-Null
     if (-not $SkipInstaller) {
+        $webviewBootstrapper = Join-Path $projectRoot 'build\MicrosoftEdgeWebview2Setup.exe'
+        if (-not (Test-Path -LiteralPath $webviewBootstrapper)) {
+            Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $webviewBootstrapper
+        }
+        $webviewSignature = Get-AuthenticodeSignature -LiteralPath $webviewBootstrapper
+        if ($webviewSignature.Status -ne 'Valid' -or $webviewSignature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+            throw 'WebView2 prerequisite must have a valid Microsoft signature'
+        }
         if (-not (Test-Path -LiteralPath $InnoCompiler)) { $InnoCompiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' }
         if (-not (Test-Path -LiteralPath $InnoCompiler)) { throw 'Inno Setup 6 is required for the installer' }
         & $InnoCompiler ('/DAppVersion=' + $version) packaging\VoicePrompt.iss

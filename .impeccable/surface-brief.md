@@ -12,7 +12,8 @@ THESIS: A compact voice utility with one clear working canvas and a contextual
 island; all seven existing tools remain visible in familiar sidebar navigation.
 
 OWN-WORLD: Forest-charcoal surfaces, mint actions, restrained amber reminders,
-Segoe UI typography, fine borders, crisp controls and consistent small radii.
+Locally bundled Encode Sans typography, fine borders, crisp controls and consistent small radii.
+Encode Sans is the measured closest match to the approved title lettering.
 The user approved layout A and the three-tab island concept on 26 October 2026.
 
 STORY: Prepare, hold Right Ctrl, speak, release, and continue working. The island

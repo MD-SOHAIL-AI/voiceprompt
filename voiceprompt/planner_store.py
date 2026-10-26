@@ -12,6 +12,7 @@ class PlannerStore:
 
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
+        existing_database = path.is_file() and path.stat().st_size > 0
         self.lock = threading.RLock()
         self._db = sqlite3.connect(path, check_same_thread=False)
         self._db.execute("PRAGMA journal_mode=WAL")
@@ -20,7 +21,7 @@ class PlannerStore:
         if version > 1:
             self._db.close()
             raise RuntimeError("This Planner database needs a newer version of VoicePrompt.")
-        if path.exists() and not path.with_suffix(".pre-desktop.sqlite3").exists():
+        if existing_database and not path.with_suffix(".pre-desktop.sqlite3").exists():
             with sqlite3.connect(path.with_suffix(".pre-desktop.sqlite3")) as backup:
                 self._db.backup(backup)
         self._db.execute("CREATE TABLE IF NOT EXISTS items (kind TEXT, id TEXT, data TEXT NOT NULL, PRIMARY KEY(kind,id))")

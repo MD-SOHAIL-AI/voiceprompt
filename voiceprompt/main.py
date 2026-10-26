@@ -402,26 +402,30 @@ class VoicePromptApp:
                 return
             sid = self._begin_work()
             chunks = self._failed_audio
+            session = DictationSession(sid)
+            # Publish the session before submitting work so an immediate Cancel
+            # cannot miss the replay and accidentally accept its transcript.
+            self._session = session
             self.last_error = ""
             self.set_status("transcribing", sid)
             self.detail = "Retrying the saved recording. The microphone is off."
-            self._executor.submit(self._retry_audio_worker, sid, chunks)
+            self._executor.submit(self._retry_audio_worker, session, chunks)
 
-    def _retry_audio_worker(self, sid, chunks):
+    def _retry_audio_worker(self, session, chunks):
         from voiceprompt.session import ReplayRecorder
-        session = DictationSession(sid)
-        self._session = session
+        sid = session.session_id
         try:
             self.transcriber.preload()
             text, duration = session.run(ReplayRecorder(chunks, session), self.transcriber,
                                          hotwords=self._hotwords(self.settings), noise_suppression=self.settings.noise_suppression)
             text = apply_replacements(text, self.settings.replacements)
-            if not self._quitting and not session.cancel.is_set():
-                self.latest_text = text
-                if text.strip():
-                    self.history.add(text, duration, self.transcriber.backend_name)
-                self._failed_audio = None
-                self.detail = "Recording recovered. Use Copy to insert the text." if text else "No speech detected in the recovered recording."
+            with self._control:
+                if not self._quitting and sid == self._current_id and not session.cancel.is_set():
+                    self.latest_text = text
+                    if text.strip():
+                        self.history.add(text, duration, self.transcriber.backend_name)
+                    self._failed_audio = None
+                    self.detail = "Recording recovered. Use Copy to insert the text." if text else "No speech detected in the recovered recording."
         except Exception as exc:
             if not self._quitting:
                 self._record_error(exc)

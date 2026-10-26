@@ -130,6 +130,30 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(self.app.history.last(), "")
         self.assertIn("queue overflow", self.app.last_error)
 
+    def test_retry_can_be_cancelled_without_saving_incomplete_text(self):
+        import numpy as np
+
+        self.app._failed_audio = ((np.ones(1600, dtype=np.float32), 16000),)
+        entered = threading.Event()
+        finish = threading.Event()
+
+        def replay(session, *args, **kwargs):
+            entered.set()
+            self.assertTrue(finish.wait(2))
+            return "must not be saved", 0.1
+
+        with patch.object(DictationSession, "run", replay):
+            self.app.retry_failed()
+            self.assertIsNotNone(self.app._session)
+            self.assertTrue(entered.wait(2))
+            self.app.cancel_current()
+            finish.set()
+            self.wait_idle()
+
+        self.assertEqual(self.app.history.last(), "")
+        self.assertEqual(self.app.latest_text, "")
+        self.assertIsNone(self.app._session)
+
     def test_stale_worker_cannot_override_new_status(self):
         self.app._current_id = 3
         self.app.status = "recording"

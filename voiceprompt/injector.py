@@ -31,8 +31,19 @@ class TextInjector:
                     previous = None
 
             pyperclip.copy(text)
-            time.sleep(0.04)
-            paste_shortcut()
+            try:
+                time.sleep(0.04)
+                paste_shortcut()
+            except Exception:
+                # Ctrl+V can fail (e.g. an elevated target window). Do not
+                # leave the dictated text in the clipboard after a failed paste.
+                if previous is not None:
+                    try:
+                        if pyperclip.paste() == text:
+                            pyperclip.copy(previous)
+                    except pyperclip.PyperclipException:
+                        pass
+                raise
             pasted_at = time.perf_counter()
 
         if self.preserve_clipboard and previous is not None:

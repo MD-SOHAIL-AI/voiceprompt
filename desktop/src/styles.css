@@ -18,6 +18,12 @@
   font-size: 14px;
   font-weight: 400;
 }
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
 body {
   margin: 0;
 }
@@ -139,6 +145,7 @@ small {
   height: 100dvh;
   display: grid;
   grid-template-columns: 198px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
 }
 .rail {
@@ -229,6 +236,7 @@ small {
   font-size: 9px;
 }
 .workspace {
+  min-height: 0;
   overflow: auto;
   padding: 51px 22px 24px;
   scrollbar-gutter: stable;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlarmClock,
   Bell,
@@ -34,6 +34,7 @@ export default function App() {
     toast = useApp((s) => s.toast);
   const count = useApp((s) => s.planner?.pendingCount ?? 0);
   const [inbox, setInbox] = useState(false);
+  useEffect(() => { document.getElementById("main-content")?.scrollTo({ top: 0 }); }, [page]);
   if (!isNative() && !isPreview())
     return (
       <main className="launch-screen">

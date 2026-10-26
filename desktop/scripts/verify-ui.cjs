@@ -247,7 +247,7 @@ async function expand(tab) {
     exact: true,
   });
   await expect(alarmToggle).toBeChecked();
-  await alarmToggle.uncheck();
+  await alarmToggle.click();
   await expect(alarmToggle).not.toBeChecked();
   report.checks.push("Alarm creation and enable/disable controls work");
   if (native) {
@@ -316,6 +316,7 @@ async function expand(tab) {
     assert(state.tasks.some((t) => t.notes === "Persistent verification note"));
   } else {
     island = await main.context().newPage();
+    await island.setViewportSize({ width: 320, height: 400 });
     await island.goto(
       "http://127.0.0.1:1426/?preview=1&surface=island&panel=focus",
     );

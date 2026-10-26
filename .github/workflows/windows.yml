@@ -55,7 +55,6 @@ jobs:
             .impeccable/review/*.png
             build/ui-checks.json
   native-package:
-    needs: regressions
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

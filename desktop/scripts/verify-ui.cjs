@@ -35,7 +35,11 @@ async function shot(page, name) {
   await page.evaluate(() => document.fonts.ready);
   await wait(240);
   const filename = path.join(out, `${native ? "native-" : ""}${name}.png`);
-  await page.screenshot({ path: filename });
+  const pixels = await page.screenshot();
+  for (let attempt = 0; ; attempt++) {
+    try { fs.writeFileSync(filename, pixels); break; }
+    catch (error) { if (attempt >= 12 || !["UNKNOWN", "EBUSY", "EPERM"].includes(error.code)) throw error; await wait(300); }
+  }
   report.screenshots.push(path.relative(root, filename));
 }
 async function navigate(name) {

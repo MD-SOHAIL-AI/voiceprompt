@@ -58,68 +58,27 @@ jobs:
           }
           $tag = $env:GITHUB_REF_NAME
           $versionMatch = Select-String -LiteralPath 'pyproject.toml' -Pattern '^version = "([^"]+)"'
-          if (-not $versionMatch) { throw 'Cannot identify the package version.' }
+          if (-not $versionMatch) { throw 'Cannot identify package version.' }
           $version = $versionMatch.Matches[0].Groups[1].Value
-          if ($tag -notmatch ('^v' + [regex]::Escape($version) + '(-preview\\.[0-9]+)? $tag --json isDraft --jq '.isDraft' 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            if ($release.Trim() -ne 'true') {
-              Write-Output 'Existing release is published; refusing to modify its assets automatically.'
-              exit 0
-            }
-            # A prior interrupted CI run may have uploaded only the checksum.
-            # Repair draft assets without changing its publication status.
-            gh release upload $tag $installer $checksum --clobber
-            if ($LASTEXITCODE -ne 0) { throw 'Could not repair draft release assets.' }
-            Write-Output 'Draft release installer and checksum are present.'
-          }
-          else {
-            gh release create $tag $installer $checksum --draft --prerelease --title "VoicePrompt $tag preview" --notes-file docs/release-notes-0.4.1.md
-            if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
-          }
-    permissions:
-      contents: write
-)) {
-            throw "Release tag $tag does not match version $version."
+          if ($tag -notmatch ('^v' + [regex]::Escape($version) + '(-preview\.[0-9]+)?$')) {
+            throw "Release tag $tag does not match package version $version."
           }
           $checksumLine = (Get-Content -LiteralPath $checksum -Raw).Trim()
           $actualHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
           if (-not $checksumLine.StartsWith($actualHash + '  ')) {
             throw 'Release checksum file does not match the installer.'
           }
-          if ($tag -notmatch '-preview\\.[0-9]+ $tag --json isDraft --jq '.isDraft' 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            if ($release.Trim() -ne 'true') {
-              Write-Output 'Existing release is published; refusing to modify its assets automatically.'
-              exit 0
-            }
-            # A prior interrupted CI run may have uploaded only the checksum.
-            # Repair draft assets without changing its publication status.
-            gh release upload $tag $installer $checksum --clobber
-            if ($LASTEXITCODE -ne 0) { throw 'Could not repair draft release assets.' }
-            Write-Output 'Draft release installer and checksum are present.'
-          }
-          else {
-            gh release create $tag $installer $checksum --draft --prerelease --title "VoicePrompt $tag preview" --notes-file docs/release-notes-0.4.1.md
-            if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
-          }
-    permissions:
-      contents: write
-) {
-            # Real microphone/paste/clean VM checks cannot be performed by this
-            # headless CI job. Do not advertise unsigned or unaccepted builds as stable.
-            throw 'Stable release is blocked until manual Windows acceptance, publisher signing, and a separately approved publication job exist.'
+          if ($tag -notmatch '-preview\.[0-9]+$') {
+            throw 'Stable releases require real Windows acceptance and publisher signing; they cannot be published by this preview job.'
           }
           $release = gh release view $tag --json isDraft --jq '.isDraft' 2>$null
           if ($LASTEXITCODE -eq 0) {
             if ($release.Trim() -ne 'true') {
-              Write-Output 'Existing release is published; refusing to modify its assets automatically.'
+              Write-Output 'Existing release is published; refusing to overwrite its assets.'
               exit 0
             }
-            # A prior interrupted CI run may have uploaded only the checksum.
-            # Repair draft assets without changing its publication status.
             gh release upload $tag $installer $checksum --clobber
             if ($LASTEXITCODE -ne 0) { throw 'Could not repair draft release assets.' }
-            Write-Output 'Draft release installer and checksum are present.'
           }
           else {
             gh release create $tag $installer $checksum --draft --prerelease --title "VoicePrompt $tag preview" --notes-file docs/release-notes-0.4.1.md

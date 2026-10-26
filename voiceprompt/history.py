@@ -39,7 +39,12 @@ class TranscriptionHistory:
             ),
         )
         data = [asdict(item) for item in items[: self.limit]]
-        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        temporary = self.path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        temporary.replace(self.path)
+
+    def clear(self):
+        self.path.write_text("[]", encoding="utf-8")
 
     def last(self) -> str:
         items = self.load()
@@ -53,15 +58,21 @@ class TranscriptionHistory:
         except (OSError, json.JSONDecodeError):
             return []
         
+        if not isinstance(data, list):
+            return []
         loaded_items = []
         for item in data:
             if not isinstance(item, dict) or not str(item.get("text", "")).strip():
                 continue
+            try:
+                duration = max(0.0, float(item.get("duration_seconds", 0.0)))
+            except (TypeError, ValueError):
+                duration = 0.0
             loaded_items.append(
                 HistoryItem(
                     text=str(item.get("text", "")),
                     created_at=str(item.get("created_at", "")),
-                    duration_seconds=float(item.get("duration_seconds", 0.0)),
+                    duration_seconds=duration,
                     source=str(item.get("source", "local")),
                     id=str(item.get("id", uuid.uuid4().hex)),
                 )

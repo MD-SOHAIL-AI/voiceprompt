@@ -33,12 +33,32 @@ class LocalTranscriberTests(unittest.TestCase):
 
         self.assertEqual(text, "hello ChatGPT")
         self.assertEqual(len(FakeWhisperModel.instances), 1)
-        call = FakeWhisperModel.instances[0].calls[0]
+        call = FakeWhisperModel.instances[0].calls[-1]
         self.assertEqual(call["beam_size"], 1)
         self.assertEqual(call["temperature"], 0.0)
         self.assertEqual(call["hotwords"], "ChatGPT")
         self.assertIn("Vocabulary: ChatGPT", call["initial_prompt"])
         self.assertFalse(call["vad_filter"])
+
+    @patch("voiceprompt.transcriber.WhisperModel", FakeWhisperModel)
+    def test_warmup_executes_once_and_session_audio_is_cleared(self) -> None:
+        FakeWhisperModel.instances.clear()
+        transcriber = LocalTranscriber(cpu_threads=2)
+        transcriber.preload()
+        transcriber.preload()
+        self.assertEqual(len(FakeWhisperModel.instances[0].calls), 1)
+        transcriber.begin_session("MyProject")
+        transcriber.accept_audio(np.ones(3200, dtype=np.float32))
+        self.assertEqual(transcriber.finish_session(), "hello ChatGPT")
+        transcriber.begin_session()
+        self.assertEqual(transcriber.finish_session(), "")
+
+    def test_model_failure_reports_actual_fallback(self) -> None:
+        with patch("voiceprompt.transcriber.WhisperModel", side_effect=[RuntimeError("missing model.bin"), FakeWhisperModel()]):
+            transcriber = LocalTranscriber(model_name="broken")
+            transcriber.preload()
+        self.assertEqual(transcriber.loaded_model, "base.en")
+        self.assertIn("missing model.bin", transcriber.fallback_reason)
 
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ class PushToTalkRecorder:
         self._frames: list[np.ndarray] = []
         self._lock = threading.Lock()
         self._started_at = 0.0
+        self._stopping = False
         self.on_audio_chunk: Callable[[np.ndarray], None] | None = None
 
     @property
@@ -55,19 +56,26 @@ class PushToTalkRecorder:
 
     def stop(self) -> Recording | None:
         with self._lock:
+            if self._stopping or self._stream is None:
+                return None
             stream = self._stream
-            self._stream = None
-        if stream is None:
-            return None
+            self._stopping = True
 
-        # Capture the final phoneme after the user releases push-to-talk.
-        time.sleep(self.config.release_grace_seconds)
-        stream.stop()
-        stream.close()
-
-        with self._lock:
-            frames = list(self._frames)
-            self._frames = []
+        # Keep the stream marked active throughout the release tail so the
+        # callback can append the user's final syllables. Only clear it once
+        # the audio stream has stopped.
+        try:
+            time.sleep(self.config.release_grace_seconds)
+            stream.stop()
+        finally:
+            try:
+                stream.close()
+            finally:
+                with self._lock:
+                    self._stream = None
+                    self._stopping = False
+                    frames = list(self._frames)
+                    self._frames = []
 
         duration = time.perf_counter() - self._started_at
         if duration < self.config.min_seconds or not frames:

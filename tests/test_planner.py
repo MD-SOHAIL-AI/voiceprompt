@@ -43,6 +43,10 @@ class PlannerTests(unittest.TestCase):
             self.service.store.put("contest", contest)
         return contest
 
+    def test_first_run_does_not_create_fake_migration_backup(self):
+        backup = self.path.with_suffix(".pre-desktop.sqlite3")
+        self.assertFalse(backup.exists(), "A brand-new database is not a migrated database")
+
     def test_arbitrary_durations_and_exactly_one_completion(self):
         for minutes in (20, 25, 30, 45, 90, 120):
             self.service.start_timer("Any activity", minutes * 60)

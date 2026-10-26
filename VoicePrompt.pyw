@@ -1,4 +1,4 @@
-from voiceprompt.main import main
+from voiceprompt.launcher import main
 
 
 if __name__ == "__main__":

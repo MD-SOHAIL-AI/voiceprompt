@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from urllib import request
+from typing import TYPE_CHECKING
 
-from google import genai
-from google.genai import types
+if TYPE_CHECKING:
+    from google import genai
 
 from voiceprompt.config import gemini_api_key, openrouter_api_key
 
@@ -72,7 +73,7 @@ class CloudCleanup:
             headers={
                 "Authorization": f"Bearer {openrouter_api_key()}",
                 "Content-Type": "application/json",
-                "X-Title": "Voice Prompt",
+                "X-Title": "VoicePrompt",
             },
             method="POST",
         )
@@ -81,6 +82,8 @@ class CloudCleanup:
         return str(data["choices"][0]["message"]["content"])
 
     def _clean_gemini(self, text: str) -> str:
+        from google.genai import types
+
         response = self._get_gemini_client().models.generate_content(
             model=self.gemini_model,
             contents=text,
@@ -95,6 +98,9 @@ class CloudCleanup:
 
     def _get_gemini_client(self) -> genai.Client:
         if self._gemini_client is None:
+            from google import genai
+            from google.genai import types
+
             self._gemini_client = genai.Client(
                 api_key=gemini_api_key(),
                 http_options=types.HttpOptions(timeout=int(self.timeout_seconds * 1000)),

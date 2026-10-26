@@ -51,5 +51,17 @@ class CloudCleanupTests(unittest.TestCase):
         self.assertEqual(cleanup.clean("short dictation"), "short dictation")
 
 
+    @patch("voiceprompt.cleanup.gemini_api_key", return_value="test-key")
+    @patch("google.genai.Client")
+    def test_gemini_client_uses_sdk_http_options(self, mock_client, _api_key) -> None:
+        cleanup = CloudCleanup("gemini", "openrouter/free", "gemini-test", timeout_seconds=4.5)
+        client = cleanup._get_gemini_client()
+
+        self.assertIs(client, mock_client.return_value)
+        mock_client.assert_called_once()
+        self.assertEqual(mock_client.call_args.kwargs["api_key"], "test-key")
+        self.assertEqual(mock_client.call_args.kwargs["http_options"].timeout, 4500)
+
+
 if __name__ == "__main__":
     unittest.main()

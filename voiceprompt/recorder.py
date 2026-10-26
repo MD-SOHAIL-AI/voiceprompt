@@ -20,9 +20,17 @@ class Recording:
 class RecorderConfig:
     sample_rate: int = 16_000
     channels: int = 1
-    blocksize: int = 512
+    blocksize: int = 0
     min_seconds: float = 0.25
     release_grace_seconds: float = 0.18
+    microphone: str = ""
+    capture_mode: str = "auto"
+    retain_audio: bool = True
+    max_seconds: float = 300.18
+
+
+def microphones() -> list[str]:
+    return sorted({str(d["name"]) for d in sd.query_devices() if d["max_input_channels"] > 0})
 
 
 class PushToTalkRecorder:
@@ -32,64 +40,163 @@ class PushToTalkRecorder:
         self._frames: list[np.ndarray] = []
         self._lock = threading.Lock()
         self._started_at = 0.0
-        self._stopping = False
-        self.on_audio_chunk: Callable[[np.ndarray], None] | None = None
+        self._capturing = False
+        self._sample_count = 0
+        self.level = 0.0
+        self.input_overflows = 0
+        self.callback_error = ""
+        self.sample_rate = self.config.sample_rate
+        self.capture_open_seconds = 0.0
+        self.input_latency_seconds = 0.0
+        self.device_name = ""
+        self.host_api = ""
+        self.fallback_reason = ""
+        self.on_audio_chunk: Callable[[np.ndarray, int], None] | None = None
 
     @property
     def is_recording(self) -> bool:
-        return self._stream is not None
+        return self._capturing
+
+    @property
+    def capture_failed(self) -> bool:
+        return bool(self._capturing and self._stream is not None and not self._stream.active)
+
+    def prepare(self) -> None:
+        """Validate start/stop, then leave capture inactive before dictation."""
+        if self._stream is not None:
+            return
+        started = time.perf_counter()
+        devices = sd.query_devices()
+        hosts = sd.query_hostapis()
+        default_index = sd.default.device[0]
+        wanted = self.config.microphone
+        if not wanted:
+            if default_index < 0:
+                raise RuntimeError("No default microphone is available. Select a microphone in Settings.")
+            wanted = str(devices[default_index]["name"])
+        candidates = [
+            (i, d, str(hosts[d["hostapi"]]["name"]))
+            for i, d in enumerate(devices)
+            # MME truncates long names; match its prefix to the full WASAPI name.
+            if d["max_input_channels"] > 0 and (
+                d["name"] == wanted or (
+                    min(len(str(d["name"])), len(wanted)) >= 20
+                    and (str(d["name"]).startswith(wanted) or wanted.startswith(str(d["name"])))
+                )
+            )
+        ]
+        if self.config.capture_mode == "wasapi":
+            candidates = [c for c in candidates if c[2] == "Windows WASAPI"]
+        elif self.config.capture_mode == "mme":
+            candidates = [c for c in candidates if c[2] == "MME"]
+        else:
+            candidates.sort(key=lambda c: {"Windows WASAPI": 0, "MME": 1}.get(c[2], 2))
+        if not candidates:
+            raise RuntimeError(f"Microphone '{wanted}' is unavailable for {self.config.capture_mode}.")
+        failures: list[str] = []
+        for index, device, host in candidates:
+            for rate in dict.fromkeys([self.config.sample_rate, int(device["default_samplerate"])]):
+                stream = None
+                try:
+                    sd.check_input_settings(device=index, samplerate=rate, channels=1, dtype="float32")
+                    stream = sd.InputStream(
+                        device=index, samplerate=rate, channels=1, dtype="float32",
+                        blocksize=self.config.blocksize, latency="low", callback=self._on_audio,
+                    )
+                    # Opening can succeed even when the driver cannot start.
+                    # _capturing remains false: probe frames are never retained.
+                    stream.start()
+                    stream.stop()
+                except Exception as exc:
+                    if stream is not None:
+                        try:
+                            stream.close()
+                        except Exception:
+                            pass
+                    failures.append(f"{host} {rate} Hz: {type(exc).__name__}: {exc}")
+                    continue
+                self._stream = stream
+                self.sample_rate = rate
+                self.device_name = str(device["name"])
+                self.host_api = host
+                self.input_latency_seconds = float(stream.latency)
+                self.capture_open_seconds = time.perf_counter() - started
+                self.fallback_reason = "; ".join(failures)
+                return
+        raise RuntimeError("Cannot open microphone. " + "; ".join(failures))
 
     def start(self) -> None:
+        if self._capturing:
+            return
+        self.prepare()
         with self._lock:
-            if self._stream is not None:
-                return
             self._frames = []
+            self._sample_count = 0
             self._started_at = time.perf_counter()
-            self._stream = sd.InputStream(
-                samplerate=self.config.sample_rate,
-                channels=self.config.channels,
-                dtype="float32",
-                blocksize=self.config.blocksize,
-                callback=self._on_audio,
-            )
-            self._stream.start()
-
-    def stop(self) -> Recording | None:
-        with self._lock:
-            if self._stopping or self._stream is None:
-                return None
-            stream = self._stream
-            self._stopping = True
-
-        # Keep the stream marked active throughout the release tail so the
-        # callback can append the user's final syllables. Only clear it once
-        # the audio stream has stopped.
+            self.input_overflows = 0
+            self.callback_error = ""
+            self._capturing = True
         try:
-            time.sleep(self.config.release_grace_seconds)
-            stream.stop()
-        finally:
-            try:
-                stream.close()
-            finally:
-                with self._lock:
-                    self._stream = None
-                    self._stopping = False
-                    frames = list(self._frames)
-                    self._frames = []
+            self._stream.start()
+        except Exception:
+            self.close()
+            raise
 
-        duration = time.perf_counter() - self._started_at
-        if duration < self.config.min_seconds or not frames:
+    def stop(self, *, grace: bool = True, released_at: float | None = None) -> Recording | None:
+        stream = self._stream
+        if stream is None or not self._capturing:
+            return None
+        released_at = released_at or time.perf_counter()
+        held_seconds = released_at - self._started_at
+        # Continue retaining callback frames until the release grace deadline.
+        if grace:
+            time.sleep(max(0.0, released_at + self.config.release_grace_seconds - time.perf_counter()))
+        try:
+            stream.stop()
+        except Exception:
+            self.close()
+            raise
+        finally:
+            with self._lock:
+                self._capturing = False
+
+        with self._lock:
+            frames = list(self._frames)
+            self._frames = []
+
+        if held_seconds < self.config.min_seconds or not self._sample_count:
             return None
 
-        audio = np.concatenate(frames).astype(np.float32, copy=False).reshape(-1)
-        return Recording(audio=audio, sample_rate=self.config.sample_rate, duration_seconds=duration)
+        audio = np.concatenate(frames).astype(np.float32, copy=False).reshape(-1) if frames else np.empty(0, dtype=np.float32)
+        return Recording(audio=audio, sample_rate=self.sample_rate, duration_seconds=self._sample_count / self.sample_rate)
+
+    def close(self) -> None:
+        with self._lock:
+            self._capturing = False
+            self._frames = []
+        stream, self._stream = self._stream, None
+        if stream is not None:
+            try:
+                stream.abort()
+            finally:
+                stream.close()
 
     def _on_audio(self, indata: np.ndarray, frames: int, time_info: object, status: object) -> None:
         with self._lock:
-            if self._stream is not None:
-                self._frames.append(indata.copy())
+            if not self._capturing:
+                return
+            if getattr(status, "input_overflow", False):
+                self.input_overflows += 1
+            remaining = max(0, round(self.sample_rate * self.config.max_seconds) - self._sample_count)
+            chunk = indata[:remaining, 0].copy()
+            if not len(chunk):
+                return
+            self._sample_count += len(chunk)
+            self.level = min(1.0, float(np.max(np.abs(chunk))))
+            if self.config.retain_audio:
+                self._frames.append(chunk)
         if self.on_audio_chunk is not None:
             try:
-                self.on_audio_chunk(indata)
-            except Exception:
-                pass
+                self.on_audio_chunk(chunk, self.sample_rate)
+            except Exception as exc:
+                self.callback_error = f"Audio delivery failed: {type(exc).__name__}: {exc}"

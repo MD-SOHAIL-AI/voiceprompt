@@ -426,14 +426,13 @@ fn island_view(
             GetForegroundWindow, IsWindow, SetForegroundWindow,
         };
         let own = window.hwnd().map(|handle| handle.0 as isize).unwrap_or(0);
-        if mode == "expanded" && focus {
-            let previous = GetForegroundWindow() as isize;
-            if previous != 0 && previous != own {
-                if let Ok(mut saved) = state.previous_focus.lock() {
-                    *saved = previous;
-                }
+        let foreground_before = GetForegroundWindow() as isize;
+        if foreground_before != 0 && foreground_before != own {
+            if let Ok(mut saved) = state.previous_focus.lock() {
+                *saved = foreground_before;
             }
-        } else if mode != "expanded" && GetForegroundWindow() as isize == own {
+        }
+        if mode != "expanded" && foreground_before == own {
             let previous = state.previous_focus.lock().map(|saved| *saved).unwrap_or(0);
             if previous != 0 && previous != own && IsWindow(previous as _) != 0 {
                 if SetForegroundWindow(previous as _) == 0 {

@@ -317,12 +317,15 @@ async function expand(tab) {
         focus: false,
       }),
     );
-    const focused = await main.evaluate(() =>
-      window.__TAURI_INTERNALS__.invoke("plugin:window|is_focused", {
-        label: "overlay",
-      }),
-    );
-    assert.equal(focused, false);
+    await expect
+      .poll(() =>
+        main.evaluate(() =>
+          window.__TAURI_INTERNALS__.invoke("plugin:window|is_focused", {
+            label: "overlay",
+          }),
+        ),
+      )
+      .toBe(false);
     report.checks.push(
       "Contest and task reminders reach native island; snooze and nonactivating compact state verified",
     );
@@ -373,10 +376,17 @@ async function expand(tab) {
     report.passed = false;
     report.error = error.stack || String(error);
     report.diagnostics = [];
-    for (const [name, page] of [["main", main], ["island", island]]) {
+    for (const [name, page] of [
+      ["main", main],
+      ["island", island],
+    ]) {
       if (page && !page.isClosed()) {
         try {
-          report.diagnostics.push({ surface: name, url: page.url(), text: (await page.locator("body").innerText()).slice(0, 4500) });
+          report.diagnostics.push({
+            surface: name,
+            url: page.url(),
+            text: (await page.locator("body").innerText()).slice(0, 4500),
+          });
           await shot(page, `failure-${name}`);
         } catch {}
       }

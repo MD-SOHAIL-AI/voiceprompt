@@ -134,6 +134,7 @@ struct DesktopState {
     engine: Mutex<Option<Arc<Engine>>>,
     quitting: AtomicBool,
     anchor: Mutex<Option<(f64, f64)>>,
+    previous_focus: Mutex<isize>,
 }
 
 fn engine(state: &DesktopState) -> Result<Arc<Engine>, String> {
@@ -419,6 +420,32 @@ fn island_view(
     let window = app
         .get_webview_window("overlay")
         .ok_or("Island unavailable.")?;
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetForegroundWindow, IsWindow, SetForegroundWindow,
+        };
+        let own = window.hwnd().map(|handle| handle.0 as isize).unwrap_or(0);
+        if mode == "expanded" && focus && !window.is_focused().unwrap_or(false) {
+            let previous = GetForegroundWindow() as isize;
+            if previous != 0 && previous != own {
+                if let Ok(mut saved) = state.previous_focus.lock() {
+                    *saved = previous;
+                }
+            }
+        } else if mode != "expanded" && window.is_focused().unwrap_or(false) {
+            let previous = state.previous_focus.lock().map(|saved| *saved).unwrap_or(0);
+            if previous != 0 && previous != own && IsWindow(previous as _) != 0 {
+                if SetForegroundWindow(previous as _) == 0 {
+                    let _ = window.hide();
+                }
+            } else {
+                // Hiding the active window lets Windows restore the previous app.
+                // show() below uses the nonactivating compact/peek style.
+                let _ = window.hide();
+            }
+        }
+    }
     if mode == "hidden" {
         return window.hide().map_err(|_| "Cannot hide the island.".into());
     }
@@ -543,6 +570,7 @@ pub fn run() {
             engine: Mutex::new(None),
             quitting: AtomicBool::new(false),
             anchor: Mutex::new(None),
+            previous_focus: Mutex::new(0),
         })
         .plugin(tauri_plugin_opener::init());
     if !smoke {

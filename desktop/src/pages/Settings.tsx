@@ -4,6 +4,7 @@ import { openLink, refresh } from "../lib/backend";
 import { notify, useApp } from "../store";
 import type { Settings } from "../types";
 import { Button, Field, Toggle, useAction } from "../components/ui";
+import { AppearanceSettings } from "../components/AppearanceSettings";
 
 export function SettingsPage() {
   const saved = useApp((s) => s.settings)!,
@@ -74,6 +75,7 @@ export function SettingsPage() {
         </Button>
       </header>
       <div className="settings-sections">
+        <AppearanceSettings />
         <section className="settings-section">
           <h2>Recording</h2>
           <div className="form-grid">
@@ -361,7 +363,7 @@ export function SettingsPage() {
         <section className="settings-section">
           <h2>VoicePrompt</h2>
           <p className="muted">
-            Version 0.5.0 · local Windows voice typing and daily focus tools
+            Version 0.5.1 · local Windows voice typing and daily focus tools
           </p>
           <div className="button-row">
             <Button

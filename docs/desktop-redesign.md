@@ -52,6 +52,14 @@ later island concept is authoritative for floating controls.
 
 ## Validation evidence and limits
 
+Startup conflict regression: an older installed tray instance can hold the
+voice-engine mutex while the new desktop opens. The bridge now retains the
+specific fatal reason across EOF and late bootstrap requests, with instructions
+to quit the other tray instance and select Restart engine. Process-launch errors
+are retained separately from the brief initial startup state. Native verification
+holds an isolated competing mutex, checks the persistent explanation, releases
+it, then restarts the engine and verifies planner data survives another restart.
+
 Machine-readable reports are generated under `build/`, with screenshots under
 `.impeccable/review/`. Windows CI uploads these as workflow artifacts. The tests
 cover protocol bounds/order, state guards, persistent reminder delivery, alarm
@@ -66,6 +74,14 @@ listed in `docs/releasing.md`. No new speech-accuracy claim is made from smoke
 tests. Unsigned artifacts remain unsigned; no publisher identity is generated.
 
 ## Development tools
+
+Version 0.5.1 adds six coordinated palettes in both light and dark, System
+brightness, and persistent Show floating island / Keep island visible controls.
+Appearance is independent of the speech engine, so changing a theme never warms
+a model or interrupts recording. Preferences synchronize across both WebViews. Neutral Black is the default; Forest remains optional. Island transparency is user-controlled from Solid to 25%, with opaque text and controls.
+Automated verification checks twelve variants for text/control contrast and serious
+accessibility failures, saved choices, live system changes, cross-window pinning,
+and native visibility without taking foreground or keyboard focus.
 
 The dependency audit prompted a Python 3.11 build floor: patched filelock 4.2.4
 and Pillow 13 require it. Certifi was updated to 2026.10.23. The previous Python

@@ -271,7 +271,7 @@ def main():
         instance_guard = SingleInstance()
     with instance_guard as instance:
         if instance.already_running:
-            writer.event("fatal", {"message": "VoicePrompt is already running. Quit the other instance first."})
+            writer.event("fatal", {"message": "Another VoicePrompt instance is running. Quit it from the system tray, then select Restart engine."})
             return 1
         app = VoicePromptApp(preload_model=False, presentation=(HeadlessPresentation, HeadlessPresentation))
         service = DesktopService(app, writer)

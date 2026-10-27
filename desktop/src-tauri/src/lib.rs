@@ -14,6 +14,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_opener::OpenerExt;
 
 const MAX_FRAME: usize = 1024 * 1024;
+const ENGINE_STOPPED: &str = "The voice engine stopped. Restart it to continue.";
 type Pending = HashMap<u64, mpsc::Sender<Result<Value, String>>>;
 
 struct Engine {
@@ -22,13 +23,14 @@ struct Engine {
     pending: Mutex<Pending>,
     serial: AtomicU64,
     closed: AtomicBool,
+    failure: Mutex<Option<String>>,
     job: Mutex<isize>,
 }
 
 impl Engine {
     fn request(&self, method: &str, params: Value) -> Result<Value, String> {
         if self.closed.load(Ordering::Acquire) {
-            return Err("The voice engine stopped. Restart it to continue.".into());
+            return Err(self.failure_message());
         }
         let id = self.serial.fetch_add(1, Ordering::Relaxed);
         let bytes =
@@ -56,7 +58,12 @@ impl Engine {
         })();
         if let Err(error) = sent {
             self.pending.lock().ok().map(|mut p| p.remove(&id));
-            return Err(error);
+            return Err(self
+                .failure
+                .lock()
+                .ok()
+                .and_then(|f| f.clone())
+                .unwrap_or(error));
         }
         let response = receiver
             .recv_timeout(Duration::from_secs(30))
@@ -67,13 +74,32 @@ impl Engine {
         response
     }
 
+    fn failure_message(&self) -> String {
+        self.failure
+            .lock()
+            .ok()
+            .and_then(|failure| failure.clone())
+            .unwrap_or_else(|| ENGINE_STOPPED.into())
+    }
+
+    fn remember_failure(&self, event: &Value) {
+        if event["event"] == "fatal" {
+            if let Some(message) = event["payload"]["message"].as_str() {
+                if !message.trim().is_empty() {
+                    if let Ok(mut failure) = self.failure.lock() {
+                        *failure = Some(message.chars().take(1024).collect());
+                    }
+                }
+            }
+        }
+    }
+
     fn disconnect(&self) {
         self.closed.store(true, Ordering::Release);
+        let message = self.failure_message();
         if let Ok(mut pending) = self.pending.lock() {
             for (_, sender) in pending.drain() {
-                let _ = sender.send(Err(
-                    "The voice engine stopped. Restart it to continue.".into()
-                ));
+                let _ = sender.send(Err(message.clone()));
             }
         }
     }
@@ -132,6 +158,7 @@ impl Engine {
 
 struct DesktopState {
     engine: Mutex<Option<Arc<Engine>>>,
+    launch_error: Mutex<Option<String>>,
     quitting: AtomicBool,
     anchor: Mutex<Option<(f64, f64)>>,
     previous_focus: Mutex<isize>,
@@ -143,7 +170,14 @@ fn engine(state: &DesktopState) -> Result<Arc<Engine>, String> {
         .lock()
         .map_err(|_| "Engine unavailable.".to_string())?
         .clone()
-        .ok_or_else(|| "The voice engine could not start. Select Restart engine.".into())
+        .ok_or_else(|| {
+            state
+                .launch_error
+                .lock()
+                .ok()
+                .and_then(|error| error.clone())
+                .unwrap_or_else(|| "The voice engine is starting. Please wait.".into())
+        })
 }
 
 #[cfg(windows)]
@@ -254,6 +288,7 @@ fn spawn_engine(app: &AppHandle) -> Result<Arc<Engine>, String> {
         pending: Mutex::new(HashMap::new()),
         serial: AtomicU64::new(1),
         closed: AtomicBool::new(false),
+        failure: Mutex::new(None),
         job: Mutex::new(job),
     });
     let reader_engine = engine.clone();
@@ -273,6 +308,9 @@ fn spawn_engine(app: &AppHandle) -> Result<Arc<Engine>, String> {
             let Ok(value) = serde_json::from_slice::<Value>(&frame) else {
                 break;
             };
+            // Keep startup failures even when the WebView has not subscribed yet.
+            // EOF and pending bootstrap requests must report the same cause.
+            reader_engine.remember_failure(&value);
             if let Some(id) = value.get("id").and_then(Value::as_u64) {
                 if let Some(sender) = reader_engine
                     .pending
@@ -295,10 +333,7 @@ fn spawn_engine(app: &AppHandle) -> Result<Arc<Engine>, String> {
             }
         }
         reader_engine.disconnect();
-        let _ = app.emit(
-            "engine-disconnected",
-            "The voice engine stopped. Restart it to continue.",
-        );
+        let _ = app.emit("engine-disconnected", reader_engine.failure_message());
         if smoke {
             let code = reader_engine
                 .child
@@ -342,7 +377,15 @@ async fn restart_engine(app: AppHandle, state: State<'_, DesktopState>) -> Resul
             .await
             .map_err(|_| "Engine shutdown failed.")?;
     }
-    let replacement = spawn_engine(&app)?;
+    *state
+        .launch_error
+        .lock()
+        .map_err(|_| "Engine unavailable.")? = None;
+    let replacement = spawn_engine(&app).inspect_err(|error| {
+        if let Ok(mut failure) = state.launch_error.lock() {
+            *failure = Some(error.clone());
+        }
+    })?;
     *state.engine.lock().map_err(|_| "Engine unavailable.")? = Some(replacement);
     app.emit("engine-restarted", ())
         .map_err(|_| "Cannot reconnect the interface.".to_string())
@@ -553,6 +596,7 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
         .get_webview_window("overlay")
         .ok_or("Island unavailable.")?;
     let reported = window.is_focused().unwrap_or(false);
+    let visible = window.is_visible().unwrap_or(false);
     #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -567,7 +611,7 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
         info.cbSize = std::mem::size_of_val(&info) as u32;
         let gui_available = GetGUIThreadInfo(0, &mut info) != 0;
         Ok(
-            json!({"reportedFocused":reported, "foreground":GetForegroundWindow() == own,
+            json!({"visible":visible, "reportedFocused":reported, "foreground":GetForegroundWindow() == own,
             "keyboardFocus":gui_available && (info.hwndFocus == own || IsChild(own, info.hwndFocus) != 0),
             "nonActivating":GetWindowLongPtrW(own, GWL_EXSTYLE) & WS_EX_NOACTIVATE as isize != 0,
             "guiAvailable":gui_available}),
@@ -575,7 +619,7 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
     }
     #[cfg(not(windows))]
     Ok(
-        json!({"reportedFocused":reported, "foreground":reported, "keyboardFocus":reported, "nonActivating":!reported}),
+        json!({"visible":visible, "reportedFocused":reported, "foreground":reported, "keyboardFocus":reported, "nonActivating":!reported}),
     )
 }
 
@@ -640,6 +684,7 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         .manage(DesktopState {
             engine: Mutex::new(None),
+            launch_error: Mutex::new(None),
             quitting: AtomicBool::new(false),
             anchor: Mutex::new(None),
             previous_focus: Mutex::new(0),
@@ -683,8 +728,13 @@ pub fn run() {
             })
             .build(app)?;
             let handle = app.handle().clone();
-            if let Ok(engine) = spawn_engine(&handle) {
-                *app.state::<DesktopState>().engine.lock().unwrap() = Some(engine);
+            match spawn_engine(&handle) {
+                Ok(engine) => {
+                    *app.state::<DesktopState>().engine.lock().unwrap() = Some(engine);
+                }
+                Err(error) => {
+                    *app.state::<DesktopState>().launch_error.lock().unwrap() = Some(error);
+                }
             }
             #[cfg(windows)]
             {
@@ -762,6 +812,51 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn idle_engine() -> Engine {
+        Engine {
+            input: Mutex::new(None),
+            child: Mutex::new(None),
+            pending: Mutex::new(HashMap::new()),
+            serial: AtomicU64::new(1),
+            closed: AtomicBool::new(false),
+            failure: Mutex::new(None),
+            job: Mutex::new(0),
+        }
+    }
+
+    #[test]
+    fn startup_failure_survives_eof_and_late_bootstrap() {
+        let engine = idle_engine();
+        let message = "Another VoicePrompt instance is running. Quit it from the system tray, then select Restart engine.";
+        engine.remember_failure(&json!({"event":"fatal","payload":{"message":message}}));
+        engine.disconnect();
+        assert_eq!(engine.request("bootstrap", json!({})), Err(message.into()));
+        assert_eq!(engine.failure_message(), message);
+    }
+
+    #[test]
+    fn pending_bootstrap_gets_specific_failure() {
+        let engine = idle_engine();
+        let (sender, receiver) = mpsc::channel();
+        engine.pending.lock().unwrap().insert(1, sender);
+        engine.remember_failure(&json!({"event":"fatal","payload":{"message":"Startup failed."}}));
+        engine.disconnect();
+        assert_eq!(receiver.recv().unwrap(), Err("Startup failed.".into()));
+        assert!(engine.pending.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn unexpected_eof_keeps_restart_guidance() {
+        let engine = idle_engine();
+        engine.remember_failure(&json!({"event":"fatal","payload":{"message":""}}));
+        engine.disconnect();
+        assert_eq!(
+            engine.request("bootstrap", json!({})),
+            Err(ENGINE_STOPPED.into())
+        );
+    }
+
     #[test]
     fn links_are_restricted() {
         assert!(allowed_url("https://codeforces.com/contest/123"));

@@ -24,6 +24,13 @@ function apply(preferences: Preferences) {
   const resolved = resolveAppearance(preferences.appearance, system.matches);
   document.documentElement.dataset.appearance = resolved;
   document.documentElement.dataset.palette = preferences.palette;
+  document.documentElement.dataset.islandTranslucent = String(
+    preferences.islandTransparency > 0,
+  );
+  document.documentElement.style.setProperty(
+    "--island-opacity",
+    `${100 - preferences.islandTransparency}%`,
+  );
   document.documentElement.style.colorScheme = resolved;
 }
 export function updatePreferences(

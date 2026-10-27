@@ -1,19 +1,19 @@
 :root {
-  --background: #131b18;
-  --rail: #1a2621;
-  --surface: #182320;
-  --input: #141e1a;
-  --text: #edf3ef;
-  --muted: #a4b9aa;
-  --accent: #8bd0af;
+  --background: #0d0d0d;
+  --rail: #171717;
+  --surface: #181818;
+  --input: #111111;
+  --text: #f1f1f1;
+  --muted: #b5b5b5;
+  --accent: #e0e0e0;
   --amber: #efbf63;
   --danger: #eba9a0;
   --processing: #a7bac9;
-  --border: #35493b;
-  --button-border: #6a8073;
-  --accent-ink: #10271b;
+  --border: #333333;
+  --button-border: #777777;
+  --accent-ink: #141414;
   --amber-ink: #291e0d;
-  --island: #0f1b18;
+  --island: #090909;
   --warning-bg: #302c1b;
   --warning-border: #8e6c31;
   --danger-bg: #352323;
@@ -24,6 +24,7 @@
   --selected: color-mix(in srgb, var(--accent) 18%, var(--surface));
   --accent-hover: color-mix(in srgb, var(--accent) 85%, var(--text));
   --track: color-mix(in srgb, var(--muted) 25%, var(--surface));
+  --island-opacity: 100%;
 }
 :root[data-appearance="light"] {
   --background: #f3f7f3;
@@ -47,6 +48,44 @@
   --danger-border: #bf756e;
   --danger-button: #a6332e;
   --danger-button-border: #a6332e;
+}
+:root[data-palette="black"][data-appearance="dark"] {
+  --background: #0d0d0d;
+  --rail: #171717;
+  --surface: #181818;
+  --input: #111111;
+  --text: #f1f1f1;
+  --muted: #b5b5b5;
+  --accent: #e0e0e0;
+  --border: #333333;
+  --button-border: #777777;
+  --accent-ink: #141414;
+  --island: #090909;
+}
+:root[data-palette="black"][data-appearance="light"] {
+  --background: #f7f7f7;
+  --rail: #ededed;
+  --surface: #ffffff;
+  --input: #fafafa;
+  --text: #202020;
+  --muted: #5c5c5c;
+  --accent: #282828;
+  --border: #d5d5d5;
+  --button-border: #7b7b7b;
+  --island: #ffffff;
+}
+:root[data-palette="forest"][data-appearance="dark"] {
+  --background: #131b18;
+  --rail: #1a2621;
+  --surface: #182320;
+  --input: #141e1a;
+  --text: #edf3ef;
+  --muted: #a4b9aa;
+  --accent: #8bd0af;
+  --border: #35493b;
+  --button-border: #6a8073;
+  --accent-ink: #10271b;
+  --island: #0f1b18;
 }
 :root[data-palette="graphite"][data-appearance="dark"] {
   --background: #181b1f;

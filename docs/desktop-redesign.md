@@ -75,11 +75,11 @@ tests. Unsigned artifacts remain unsigned; no publisher identity is generated.
 
 ## Development tools
 
-Version 0.5.1 adds five coordinated palettes in both light and dark, System
+Version 0.5.1 adds six coordinated palettes in both light and dark, System
 brightness, and persistent Show floating island / Keep island visible controls.
 Appearance is independent of the speech engine, so changing a theme never warms
-a model or interrupts recording. Preferences synchronize across both WebViews.
-Automated verification checks ten variants for text/control contrast and serious
+a model or interrupts recording. Preferences synchronize across both WebViews. Neutral Black is the default; Forest remains optional. Island transparency is user-controlled from Solid to 25%, with opaque text and controls.
+Automated verification checks twelve variants for text/control contrast and serious
 accessibility failures, saved choices, live system changes, cross-window pinning,
 and native visibility without taking foreground or keyboard focus.
 

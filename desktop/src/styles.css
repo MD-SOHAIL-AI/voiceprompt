@@ -966,6 +966,34 @@ legend {
   margin-top: 28px;
   font-size: 15px;
 }
+.island-transparency {
+  max-width: 600px;
+  margin-top: 22px;
+}
+.island-transparency > label,
+.transparency-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  line-height: 1.5;
+}
+.island-transparency output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.island-transparency input[type="range"] {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.transparency-scale {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
 .island-header strong {
   margin-right: auto;
 }
@@ -1174,6 +1202,14 @@ summary {
     width 180ms cubic-bezier(0.16, 1, 0.3, 1),
     height 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+html[data-island-translucent="true"] .island-frame {
+  --muted: var(--text);
+}
+html[data-island-translucent="true"] .island-frame .notification-content p,
+html[data-island-translucent="true"] .island-frame .peek-copy p,
+html[data-island-translucent="true"] .island-frame a {
+  color: var(--text);
+}
 .island-frame.view-expanded {
   width: 320px;
   height: min(400px, 100dvh);
@@ -1185,7 +1221,11 @@ summary {
 .island-capsule {
   width: 112px;
   height: 32px;
-  background: var(--island);
+  background: color-mix(
+    in srgb,
+    var(--island) var(--island-opacity),
+    transparent
+  );
   border: 1px solid var(--button-border);
   border-radius: 18px;
   padding: 0 11px;
@@ -1201,6 +1241,7 @@ summary {
   color: var(--accent);
 }
 .island-capsule.kind-error {
+  background: var(--danger-bg);
   border-color: var(--danger-border);
   color: var(--danger);
 }
@@ -1268,7 +1309,11 @@ summary {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--button-border);
-  background: var(--island);
+  background: color-mix(
+    in srgb,
+    var(--island) var(--island-opacity),
+    transparent
+  );
   border-radius: 18px;
   overflow: hidden;
   padding: 13px;
@@ -1503,7 +1548,11 @@ summary {
   flex-direction: column;
   justify-content: space-between;
   border: 1px solid var(--warning-border);
-  background: var(--hover);
+  background: color-mix(
+    in srgb,
+    var(--island) var(--island-opacity),
+    transparent
+  );
   border-radius: 16px;
   padding: 12px 13px 8px;
 }

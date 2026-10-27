@@ -6,7 +6,7 @@ import {
 } from "./preferences-model";
 
 describe("saved desktop preferences", () => {
-  it("preserves the existing dark forest appearance on upgrade", () => {
+  it("uses neutral Black unless a saved preference is available", () => {
     expect(parsePreferences(null)).toEqual(defaultPreferences);
     expect(parsePreferences({ version: 99, palette: "ocean" })).toEqual(
       defaultPreferences,
@@ -27,6 +27,7 @@ describe("saved desktop preferences", () => {
       palette: "ocean",
       islandPinned: true,
       islandEnabled: true,
+      islandTransparency: 0,
     });
     expect(
       parsePreferences({
@@ -42,5 +43,25 @@ describe("saved desktop preferences", () => {
     expect(resolveAppearance("system", false)).toBe("light");
     expect(resolveAppearance("light", true)).toBe("light");
     expect(resolveAppearance("dark", false)).toBe("dark");
+  });
+  it("bounds transparency and upgrades preferences without the new field", () => {
+    for (const [input, expected] of [
+      [-20, 0],
+      [15, 15],
+      [90, 25],
+      [NaN, 0],
+      [Infinity, 0],
+    ]) {
+      expect(
+        parsePreferences({ ...defaultPreferences, islandTransparency: input })
+          .islandTransparency,
+      ).toBe(expected);
+    }
+    expect(parsePreferences({ version: 1, palette: "forest" }).palette).toBe(
+      "forest",
+    );
+    expect(
+      parsePreferences({ version: 1, palette: "forest" }).islandTransparency,
+    ).toBe(0);
   });
 });

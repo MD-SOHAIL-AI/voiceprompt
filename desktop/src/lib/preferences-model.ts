@@ -1,4 +1,5 @@
 export const palettes = [
+  { id: "black", name: "Black", swatch: "#262626" },
   { id: "forest", name: "Forest", swatch: "#8bd0af" },
   { id: "graphite", name: "Graphite", swatch: "#b5c2d0" },
   { id: "ocean", name: "Ocean", swatch: "#89bde9" },
@@ -13,13 +14,15 @@ export interface Preferences {
   palette: Palette;
   islandEnabled: boolean;
   islandPinned: boolean;
+  islandTransparency: number;
 }
 export const defaultPreferences: Preferences = {
   version: 1,
   appearance: "dark",
-  palette: "forest",
+  palette: "black",
   islandEnabled: true,
   islandPinned: false,
+  islandTransparency: 0,
 };
 export function parsePreferences(value: unknown): Preferences {
   if (!value || typeof value !== "object") return { ...defaultPreferences };
@@ -36,6 +39,11 @@ export function parsePreferences(value: unknown): Preferences {
     islandEnabled:
       typeof p.islandEnabled === "boolean" ? p.islandEnabled : true,
     islandPinned: typeof p.islandPinned === "boolean" ? p.islandPinned : false,
+    islandTransparency:
+      typeof p.islandTransparency === "number" &&
+      Number.isFinite(p.islandTransparency)
+        ? Math.max(0, Math.min(25, Math.round(p.islandTransparency)))
+        : 0,
   };
 }
 export function resolveAppearance(appearance: Appearance, systemDark: boolean) {

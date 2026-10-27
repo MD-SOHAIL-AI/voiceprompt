@@ -13,6 +13,7 @@ export function AppearanceSettings() {
   const palette = usePreferences((p) => p.palette);
   const enabled = usePreferences((p) => p.islandEnabled);
   const pinned = usePreferences((p) => p.islandPinned);
+  const transparency = usePreferences((p) => p.islandTransparency);
   return (
     <section className="settings-section appearance-settings">
       <h2>Appearance</h2>
@@ -83,6 +84,38 @@ export function AppearanceSettings() {
         Keep it visible for quick access, even when idle. Turn this off to hide
         it automatically when nothing is active.
       </p>
+      <div className="island-transparency">
+        <label htmlFor="island-transparency">
+          Island transparency{" "}
+          <output htmlFor="island-transparency">
+            {transparency === 0 ? "Solid" : `${transparency}%`}
+          </output>
+        </label>
+        <input
+          id="island-transparency"
+          type="range"
+          min="0"
+          max="25"
+          step="5"
+          value={transparency}
+          disabled={!enabled}
+          aria-valuetext={
+            transparency === 0 ? "Solid" : `${transparency}% transparent`
+          }
+          onChange={(event) =>
+            updatePreferences({
+              islandTransparency: Number(event.target.value),
+            })
+          }
+        />
+        <div className="transparency-scale" aria-hidden="true">
+          <span>Solid</span>
+          <span>More transparent</span>
+        </div>
+        <small>
+          Let a little of your desktop through. Text and controls stay clear.
+        </small>
+      </div>
     </section>
   );
 }

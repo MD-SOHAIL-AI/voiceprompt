@@ -4,7 +4,7 @@
   "build": {"beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:1420", "beforeBuildCommand": "npm run build", "frontendDist": "../dist"},
   "app": {
     "windows": [
-      {"label": "main", "title": "VoicePrompt", "width": 1120, "height": 790, "minWidth": 800, "minHeight": 560, "center": true, "decorations": false, "backgroundColor": "#141E1AFF", "visible": true},
+      {"label": "main", "title": "VoicePrompt", "width": 1120, "height": 790, "minWidth": 800, "minHeight": 560, "center": true, "decorations": false, "backgroundColor": "#0D0D0DFF", "visible": true},
       {"label": "overlay", "title": "VoicePrompt island", "url": "index.html?surface=island", "width": 112, "height": 32, "resizable": false, "decorations": false, "transparent": true, "alwaysOnTop": true, "skipTaskbar": true, "shadow": false, "visible": false, "focus": false, "focusable": false}
     ],
     "security": {"csp": "default-src 'self'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'"}

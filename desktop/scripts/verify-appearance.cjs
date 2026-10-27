@@ -28,7 +28,14 @@ module.exports = async function verifyAppearance({
   await show.check();
   await pin.check();
   report.themes = [];
-  for (const palette of ["Forest", "Graphite", "Ocean", "Lavender", "Sand"]) {
+  for (const palette of [
+    "Black",
+    "Forest",
+    "Graphite",
+    "Ocean",
+    "Lavender",
+    "Sand",
+  ]) {
     await main.getByText(palette, { exact: true }).click();
     for (const appearance of ["Light", "Dark"]) {
       await main.getByText(appearance, { exact: true }).click();
@@ -47,14 +54,20 @@ module.exports = async function verifyAppearance({
         const canvas = document.createElement("canvas");
         canvas.width = canvas.height = 1;
         const ctx = canvas.getContext("2d");
-        function luminance(token) {
+        function rgb(token) {
           ctx.fillStyle = style.getPropertyValue(`--${token}`).trim();
           ctx.fillRect(0, 0, 1, 1);
-          const [r, g, b] = [...ctx.getImageData(0, 0, 1, 1).data].map((x) => {
+          return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+        }
+        function luminanceRGB(channels) {
+          const [r, g, b] = channels.map((x) => {
             const c = x / 255;
             return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
           });
           return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+        function luminance(token) {
+          return luminanceRGB(rgb(token));
         }
         const failures = [];
         function check(fg, bg, minimum) {
@@ -83,6 +96,30 @@ module.exports = async function verifyAppearance({
         check("amber", "warning-bg", 4.5);
         check("amber-ink", "amber", 4.5);
         check("danger", "danger-bg", 4.5);
+        // At maximum transparency, test text and status glyphs against both
+        // extremes of the desktop behind the island. Translucent secondary
+        // text uses the stronger text token; controls retain opaque fills.
+        for (const desktop of [0, 255]) {
+          const bg = luminanceRGB(
+            rgb("island").map((c) => c * 0.75 + desktop * 0.25),
+          );
+          for (const [fg, minimum] of [
+            ["text", 4.5],
+            ["accent", 3],
+            ["amber", 3],
+          ]) {
+            const color = luminance(fg);
+            const ratio =
+              (Math.max(color, bg) + 0.05) / (Math.min(color, bg) + 0.05);
+            if (ratio < minimum)
+              failures.push({
+                fg,
+                bg: `25% transparent over ${desktop}`,
+                ratio,
+                minimum,
+              });
+          }
+        }
         return failures;
       });
       assert.deepEqual(
@@ -113,6 +150,27 @@ module.exports = async function verifyAppearance({
       );
     }
   }
+  // The native window stays transparent; only the surface fill changes, never text opacity.
+  const transparency = main.getByRole("slider", {
+    name: /^Island transparency/,
+  });
+  await transparency.focus();
+  await transparency.press("End");
+  await expect(transparency).toHaveValue("25");
+  for (const page of [main, island]) {
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-island-translucent",
+      "true",
+    );
+    assert.equal(
+      await page.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--island-opacity")
+          .trim(),
+      ),
+      "75%",
+    );
+  }
   // Keyboard selection, saved choices, and the island's independently loaded document.
   await main.getByRole("radio", { name: "Light", exact: true }).focus();
   await main.getByRole("radio", { name: "Light", exact: true }).press("Space");
@@ -125,6 +183,7 @@ module.exports = async function verifyAppearance({
   );
   await settings();
   await expect(pin).toBeChecked();
+  await expect(transparency).toHaveValue("25");
   await island.reload();
   await expect(island.locator("html")).toHaveAttribute(
     "data-appearance",
@@ -133,6 +192,7 @@ module.exports = async function verifyAppearance({
   await expect(island.locator("html")).toHaveAttribute("data-palette", "ocean");
   await expand("Focus");
   await shot(island, "appearance-island-light");
+  await expect(island.locator(".island-panel")).toHaveCSS("opacity", "1");
   await island
     .getByRole("button", { name: "Keep island visible", exact: true })
     .click();
@@ -213,10 +273,14 @@ module.exports = async function verifyAppearance({
     main.emulateMedia({ colorScheme: null }),
     island.emulateMedia({ colorScheme: null }),
   ]);
-  await main.getByText("Forest", { exact: true }).click();
+  await main.getByText("Black", { exact: true }).click();
   await main.getByText("Dark", { exact: true }).click();
+  await shot(island, "appearance-island-black-translucent");
+  await transparency.focus();
+  await transparency.press("Home");
+  await expect(transparency).toHaveValue("0");
   await pin.uncheck();
   report.checks.push(
-    "Ten theme variants pass contrast and accessibility; keyboard, System changes, persistence and two-window synchronization verified",
+    "Twelve theme variants pass contrast and accessibility; keyboard, System changes, persistence, user-controlled transparency and two-window synchronization verified",
   );
 };

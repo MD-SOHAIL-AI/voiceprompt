@@ -6,100 +6,100 @@
     "colorMeta": {
       "background": {
         "role": "neutral",
-        "displayName": "Forest charcoal",
+        "displayName": "Black canvas",
         "tonalRamp": [
-          "oklch(0.150 0.01320 170.15)",
-          "oklch(0.264 0.01320 170.15)",
-          "oklch(0.379 0.01320 170.15)",
-          "oklch(0.493 0.01320 170.15)",
-          "oklch(0.607 0.01320 170.15)",
-          "oklch(0.721 0.01320 170.15)",
-          "oklch(0.836 0.01320 170.15)",
-          "oklch(0.950 0.01320 170.15)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "rail": {
         "role": "neutral",
-        "displayName": "Forest rail",
+        "displayName": "Neutral charcoal rail",
         "tonalRamp": [
-          "oklch(0.150 0.01919 167.33)",
-          "oklch(0.264 0.01919 167.33)",
-          "oklch(0.379 0.01919 167.33)",
-          "oklch(0.493 0.01919 167.33)",
-          "oklch(0.607 0.01919 167.33)",
-          "oklch(0.721 0.01919 167.33)",
-          "oklch(0.836 0.01919 167.33)",
-          "oklch(0.950 0.01919 167.33)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "surface": {
         "role": "neutral",
-        "displayName": "Working forest",
+        "displayName": "Neutral working surface",
         "tonalRamp": [
-          "oklch(0.150 0.01653 176.27)",
-          "oklch(0.264 0.01653 176.27)",
-          "oklch(0.379 0.01653 176.27)",
-          "oklch(0.493 0.01653 176.27)",
-          "oklch(0.607 0.01653 176.27)",
-          "oklch(0.721 0.01653 176.27)",
-          "oklch(0.836 0.01653 176.27)",
-          "oklch(0.950 0.01653 176.27)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "input": {
         "role": "neutral",
-        "displayName": "Recessed forest",
+        "displayName": "Neutral input",
         "tonalRamp": [
-          "oklch(0.150 0.01639 168.32)",
-          "oklch(0.264 0.01639 168.32)",
-          "oklch(0.379 0.01639 168.32)",
-          "oklch(0.493 0.01639 168.32)",
-          "oklch(0.607 0.01639 168.32)",
-          "oklch(0.721 0.01639 168.32)",
-          "oklch(0.836 0.01639 168.32)",
-          "oklch(0.950 0.01639 168.32)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "text": {
         "role": "neutral",
-        "displayName": "Light leaf",
+        "displayName": "White foreground",
         "tonalRamp": [
-          "oklch(0.150 0.00827 157.09)",
-          "oklch(0.264 0.00827 157.09)",
-          "oklch(0.379 0.00827 157.09)",
-          "oklch(0.493 0.00827 157.09)",
-          "oklch(0.607 0.00827 157.09)",
-          "oklch(0.721 0.00827 157.09)",
-          "oklch(0.836 0.00827 157.09)",
-          "oklch(0.950 0.00827 157.09)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "muted": {
         "role": "neutral",
-        "displayName": "Muted leaf",
+        "displayName": "Secondary gray",
         "tonalRamp": [
-          "oklch(0.150 0.03132 154.51)",
-          "oklch(0.264 0.03132 154.51)",
-          "oklch(0.379 0.03132 154.51)",
-          "oklch(0.493 0.03132 154.51)",
-          "oklch(0.607 0.03132 154.51)",
-          "oklch(0.721 0.03132 154.51)",
-          "oklch(0.836 0.03132 154.51)",
-          "oklch(0.950 0.03132 154.51)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "accent": {
         "role": "primary",
-        "displayName": "Mint",
+        "displayName": "White action",
         "tonalRamp": [
-          "oklch(0.150 0.08434 163.03)",
-          "oklch(0.264 0.08434 163.03)",
-          "oklch(0.379 0.08434 163.03)",
-          "oklch(0.493 0.08434 163.03)",
-          "oklch(0.607 0.08434 163.03)",
-          "oklch(0.721 0.08434 163.03)",
-          "oklch(0.836 0.08434 163.03)",
-          "oklch(0.950 0.08434 163.03)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "amber": {
@@ -146,30 +146,30 @@
       },
       "border": {
         "role": "neutral",
-        "displayName": "Forest divider",
+        "displayName": "Neutral separator",
         "tonalRamp": [
-          "oklch(0.150 0.03457 154.01)",
-          "oklch(0.264 0.03457 154.01)",
-          "oklch(0.379 0.03457 154.01)",
-          "oklch(0.493 0.03457 154.01)",
-          "oklch(0.607 0.03457 154.01)",
-          "oklch(0.721 0.03457 154.01)",
-          "oklch(0.836 0.03457 154.01)",
-          "oklch(0.950 0.03457 154.01)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       },
       "button-border": {
         "role": "neutral",
-        "displayName": "Control stroke",
+        "displayName": "Control border",
         "tonalRamp": [
-          "oklch(0.150 0.03236 159.28)",
-          "oklch(0.264 0.03236 159.28)",
-          "oklch(0.379 0.03236 159.28)",
-          "oklch(0.493 0.03236 159.28)",
-          "oklch(0.607 0.03236 159.28)",
-          "oklch(0.721 0.03236 159.28)",
-          "oklch(0.836 0.03236 159.28)",
-          "oklch(0.950 0.03236 159.28)"
+          "oklch(0.150 0.00000 0.00)",
+          "oklch(0.264 0.00000 0.00)",
+          "oklch(0.379 0.00000 0.00)",
+          "oklch(0.493 0.00000 0.00)",
+          "oklch(0.607 0.00000 0.00)",
+          "oklch(0.721 0.00000 0.00)",
+          "oklch(0.836 0.00000 0.00)",
+          "oklch(0.950 0.00000 0.00)"
         ]
       }
     },
@@ -279,7 +279,7 @@
       "source": "desktop/src/tokens.css",
       "default": {
         "appearance": "dark",
-        "palette": "forest"
+        "palette": "black"
       },
       "appearances": [
         "light",
@@ -287,6 +287,7 @@
         "system"
       ],
       "palettes": [
+        "black",
         "forest",
         "graphite",
         "ocean",
@@ -298,7 +299,14 @@
         "show",
         "auto-hide when idle",
         "pinned while idle"
-      ]
+      ],
+      "islandTransparency": {
+        "minimum": 0,
+        "maximum": 25,
+        "default": 0,
+        "unit": "percent",
+        "scope": "background fill only"
+      }
     }
   },
   "components": [
@@ -384,7 +392,7 @@
   ],
   "narrative": {
     "northStar": "The compact voice utility",
-    "overview": "Forest-charcoal surfaces and mint actions make a quiet working canvas for local dictation and daily planning. Fine borders, readable lettering, and restrained amber reminders keep operational state easy to find. Controls are crisp and compact; content supplies the hierarchy without decorative imagery.\n\nThe approved replacement world is implemented in Tauri 2, React 19, and TypeScript. This document records `desktop/src/tokens.css`, `styles.css`, and the implemented components and pages. It supersedes the earlier light Qt design document. The selected composition remains in `.impeccable/surface-brief.md` and the approved mockups; implementation values govern this system. Five palettes now offer authored light and dark variants, System brightness, instant two-window synchronization, and persistent island visibility controls.",
+    "overview": "Forest-charcoal surfaces and mint actions make a quiet working canvas for local dictation and daily planning. Fine borders, readable lettering, and restrained amber reminders keep operational state easy to find. Controls are crisp and compact; content supplies the hierarchy without decorative imagery.\n\nThe approved replacement world is implemented in Tauri 2, React 19, and TypeScript. This document records `desktop/src/tokens.css`, `styles.css`, and the implemented components and pages. It supersedes the earlier light Qt design document. The selected composition remains in `.impeccable/surface-brief.md` and the approved mockups; implementation values govern this system. Six palettes now offer authored light and dark variants, System brightness, instant two-window synchronization, and persistent island visibility controls.",
     "keyCharacteristics": [
       "Forest surfaces separated by fine borders and small tonal changes.",
       "Mint primary actions, progress, and keyboard focus; amber reminder emphasis.",

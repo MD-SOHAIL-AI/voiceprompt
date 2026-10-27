@@ -1,19 +1,19 @@
 ---
 name: "VoicePrompt"
-description: "A compact local voice utility in forest charcoal and mint."
+description: "A compact local voice utility in neutral Black with optional color themes."
 colors:
-  background: "#131b18"
-  rail: "#1a2621"
-  surface: "#182320"
-  input: "#141e1a"
-  text: "#edf3ef"
-  muted: "#a4b9aa"
-  accent: "#8bd0af"
+  background: "#0d0d0d"
+  rail: "#171717"
+  surface: "#181818"
+  input: "#111111"
+  text: "#f1f1f1"
+  muted: "#b5b5b5"
+  accent: "#e0e0e0"
   amber: "#efbf63"
   danger: "#eba9a0"
   processing: "#a7bac9"
-  border: "#35493b"
-  button-border: "#6a8073"
+  border: "#333333"
+  button-border: "#777777"
 typography:
   display:
     fontFamily: "Encode Sans, Segoe UI, system-ui, sans-serif"
@@ -151,9 +151,9 @@ The approved replacement world is implemented in Tauri 2, React 19, and TypeScri
 
 ## Colors
 
-The default palette is a dark forest neutral family with one mint action accent and restrained colors for reminders and operational state. The frontmatter preserves its canonical CSS hex values. Settings also offers Graphite, Ocean, Lavender and Sand. Each palette has authored light and dark variants in `desktop/src/tokens.css`; System brightness follows the Windows preference. Semantic roles stay consistent across palettes: action and focus use `accent`, reminders use `amber`, and failures use `danger`. Colored action fills pair with `accent-ink`; text, borders, selection, native input appearance and the island follow the active variant.
+The default palette is neutral Black with a restrained white action accent and restrained colors for reminders and operational state. The frontmatter preserves its canonical CSS hex values. Settings also offers Forest, Graphite, Ocean, Lavender and Sand. Each palette has authored light and dark variants in `desktop/src/tokens.css`; System brightness follows the Windows preference. Semantic roles stay consistent across palettes: action and focus use `accent`, reminders use `amber`, and failures use `danger`. Colored action fills pair with `accent-ink`; text, borders, selection, native input appearance and the island follow the active variant.
 
-Appearance controls use labeled native radio groups with visible checked and keyboard-focus states. Changes apply immediately, save independently from speech settings in the versioned WebView preferences, and synchronize between the main window and island. The existing dark Forest appearance remains the upgrade default. Show floating island disables the surface; Keep island visible pins its compact idle state without taking keyboard focus. The expanded island exposes the same pin control.
+Appearance controls use labeled native radio groups with visible checked and keyboard-focus states. Changes apply immediately, save independently from speech settings in the versioned WebView preferences, and synchronize between the main window and island. Neutral Black is the default, as requested; valid saved palette choices are retained. Show floating island disables the surface; Keep island visible pins its compact idle state without taking keyboard focus. The expanded island exposes the same pin control. Island transparency ranges from Solid to 25%. Only the surface fill becomes transparent; foreground text, controls, error surfaces and editor fields remain opaque. Secondary text becomes stronger while translucency is active to remain legible against the desktop.
 
 ### Primary
 

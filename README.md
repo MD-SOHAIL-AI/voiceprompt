@@ -17,10 +17,10 @@ If you used the 0.4.0 uninstaller while VoicePrompt was running and files remain
 ## Voice typing
 
 In **Settings → Appearance**, choose Light, Dark, or System brightness and a
-Forest, Graphite, Ocean, Lavender, or Sand color theme. Changes save automatically
+Black, Forest, Graphite, Ocean, Lavender, or Sand color theme. Black is the default. Changes save automatically
 and update both windows. **Show floating island** hides or reveals it;
 **Keep island visible** keeps it available while idle. The pin button in the
-expanded island offers the same control. With pinning off, active recordings,
+expanded island offers the same control. The Island transparency slider ranges from Solid to 25% transparent; text and controls remain opaque. With pinning off, active recordings,
 timers, alarms and pending reminders still keep the island visible.
 
 1. Choose a microphone, use **Check microphone**, then select **Prepare model and microphone**.

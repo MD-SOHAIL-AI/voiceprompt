@@ -97,6 +97,17 @@ class DesktopBridgeTests(unittest.TestCase):
         self.advance(60)
         self.assertFalse(self.planner.claim_reminder_sound())
 
+    def test_native_datetime_inputs_save_tasks_and_alarms(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        local_due = datetime.fromtimestamp(self.clock.wall + 3600, ZoneInfo('Asia/Kolkata')).strftime('%Y-%m-%dT%H:%M')
+        self.service.dispatch('planner.task.save', {'title': 'Due task', 'localDue': local_due})
+        self.service.dispatch('planner.alarm.save', {'title': 'Due alarm', 'localDue': local_due})
+        task = self.planner.store.all('task')[0]
+        alarm = self.planner.store.all('alarm')[0]
+        self.assertEqual(task['due'], alarm['due'])
+        self.assertLess(abs(alarm['due'] - self.clock.wall - 3600), 60)
+
     def test_alarm_repeats_are_bounded_and_edit_preserves_disabled(self):
         alarm = self.planner.save_alarm('Break', self.clock.wall + 10)
         self.planner.toggle_alarm(alarm)

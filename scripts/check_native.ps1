@@ -1,6 +1,7 @@
-param([string]$Python = '.venv\Scripts\python.exe')
+param([string]$Python = '.venv311\Scripts\python.exe', [string]$AppDirectory = '')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+if (-not $AppDirectory) { $AppDirectory = Join-Path $root 'dist\VoicePrompt' }
 $profile = Join-Path $root ('.tools\native-profile-' + [guid]::NewGuid().ToString('N'))
 & $Python (Join-Path $root 'scripts\create_acceptance_profile.py') $profile
 if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated verification data' }
@@ -20,7 +21,7 @@ if (-not $env:VOICEPROMPT_PYTHON) { $env:VOICEPROMPT_PYTHON = (Resolve-Path -Lit
 $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=' + $inspectPort
 $app = $null
 try {
-    $app = Start-Process -FilePath (Join-Path $root 'dist\VoicePrompt\VoicePrompt.exe') -WindowStyle Hidden -PassThru
+    $app = Start-Process -FilePath (Join-Path $AppDirectory 'VoicePrompt.exe') -WindowStyle Hidden -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(60)
     do {
         try { $ready = Invoke-RestMethod -Uri ($inspectUrl + '/json/version'); if ($ready.webSocketDebuggerUrl) { break } } catch {}

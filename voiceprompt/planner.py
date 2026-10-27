@@ -24,7 +24,7 @@ DEFAULT_PREFERENCES = {
 def local_timestamp(text: str, zone: str) -> float:
     """Validate a local minute, including nonexistent daylight saving times."""
     try:
-        naive = datetime.strptime(text.strip(), "%Y-%m-%d %H:%M")
+        naive = datetime.strptime(text.strip().replace("T", " ", 1), "%Y-%m-%d %H:%M")
         aware = naive.replace(tzinfo=ZoneInfo(zone))
         if datetime.fromtimestamp(aware.timestamp(), aware.tzinfo).replace(tzinfo=None) != naive:
             raise ValueError()

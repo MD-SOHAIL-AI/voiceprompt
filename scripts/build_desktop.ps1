@@ -1,11 +1,12 @@
 param(
-    [string]$Python = '.venv\Scripts\python.exe',
+    [string]$Python = '',
     [string]$InnoCompiler = '.tools\inno\ISCC.exe',
     [string]$SignThumbprint = '',
     [switch]$SkipInstaller
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+if (-not $Python) { $Python = if (Test-Path -LiteralPath (Join-Path $projectRoot '.venv311\Scripts\python.exe')) { '.venv311\Scripts\python.exe' } else { '.venv\Scripts\python.exe' } }
 Push-Location -LiteralPath $projectRoot
 try {
     $version = [regex]::Match((Get-Content pyproject.toml -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value

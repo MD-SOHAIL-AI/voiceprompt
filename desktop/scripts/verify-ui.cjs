@@ -183,6 +183,7 @@ async function expand(tab) {
     .getByRole("textbox", { name: "Notes", exact: true })
     .fill("Persistent verification note");
   await editor.getByRole("button", { name: "Save task", exact: true }).click();
+  await expect(editor).toBeHidden();
   await expect(
     main.getByText("Persistent verification note", { exact: true }),
   ).toBeVisible();
@@ -368,9 +369,18 @@ async function expand(tab) {
   report.checks.push("No uncaught renderer errors");
   report.passed = true;
 })()
-  .catch((error) => {
+  .catch(async (error) => {
     report.passed = false;
     report.error = error.stack || String(error);
+    report.diagnostics = [];
+    for (const [name, page] of [["main", main], ["island", island]]) {
+      if (page && !page.isClosed()) {
+        try {
+          report.diagnostics.push({ surface: name, url: page.url(), text: (await page.locator("body").innerText()).slice(0, 4500) });
+          await shot(page, `failure-${name}`);
+        } catch {}
+      }
+    }
     process.exitCode = 1;
   })
   .finally(async () => {

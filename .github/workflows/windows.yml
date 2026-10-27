@@ -35,6 +35,13 @@ jobs:
           python -m pip check
           python -m compileall -q voiceprompt tests
           python scripts/verify_versions.py
+      - name: Audit Python dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --target .tools/audit-deps pip-audit==2.10.1
+          New-Item -ItemType Directory -Force build | Out-Null
+          $env:PYTHONPATH = (Join-Path $PWD '.tools/audit-deps')
+          python -m pip_audit -r requirements-lock.txt --no-deps --disable-pip --format json --output build/python-audit.json
       - name: Engine, storage, transport and recording regressions
         env:
           VOICEPROMPT_TEST_LEGACY_TK: '0'
@@ -60,6 +67,7 @@ jobs:
           path: |
             .impeccable/review/*.png
             build/ui-checks.json
+            build/python-audit.json
   native-package:
     runs-on: windows-latest
     steps:

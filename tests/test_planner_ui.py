@@ -3,9 +3,12 @@ from __future__ import annotations
 import ctypes
 import sys
 import tempfile
-import tkinter as tk
 import os
 import unittest
+try:
+    import tkinter as tk
+except ImportError:
+    raise unittest.SkipTest("Legacy Tk is not installed; the native desktop excludes it")
 from pathlib import Path
 from tkinter import ttk
 from unittest.mock import MagicMock, patch

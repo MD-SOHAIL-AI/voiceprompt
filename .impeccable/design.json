@@ -1,0 +1,403 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-27T00:08:09.858898Z",
+  "title": "Design System: VoicePrompt",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Forest charcoal",
+        "tonalRamp": [
+          "oklch(0.150 0.01320 170.15)",
+          "oklch(0.264 0.01320 170.15)",
+          "oklch(0.379 0.01320 170.15)",
+          "oklch(0.493 0.01320 170.15)",
+          "oklch(0.607 0.01320 170.15)",
+          "oklch(0.721 0.01320 170.15)",
+          "oklch(0.836 0.01320 170.15)",
+          "oklch(0.950 0.01320 170.15)"
+        ]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Forest rail",
+        "tonalRamp": [
+          "oklch(0.150 0.01919 167.33)",
+          "oklch(0.264 0.01919 167.33)",
+          "oklch(0.379 0.01919 167.33)",
+          "oklch(0.493 0.01919 167.33)",
+          "oklch(0.607 0.01919 167.33)",
+          "oklch(0.721 0.01919 167.33)",
+          "oklch(0.836 0.01919 167.33)",
+          "oklch(0.950 0.01919 167.33)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Working forest",
+        "tonalRamp": [
+          "oklch(0.150 0.01653 176.27)",
+          "oklch(0.264 0.01653 176.27)",
+          "oklch(0.379 0.01653 176.27)",
+          "oklch(0.493 0.01653 176.27)",
+          "oklch(0.607 0.01653 176.27)",
+          "oklch(0.721 0.01653 176.27)",
+          "oklch(0.836 0.01653 176.27)",
+          "oklch(0.950 0.01653 176.27)"
+        ]
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Recessed forest",
+        "tonalRamp": [
+          "oklch(0.150 0.01639 168.32)",
+          "oklch(0.264 0.01639 168.32)",
+          "oklch(0.379 0.01639 168.32)",
+          "oklch(0.493 0.01639 168.32)",
+          "oklch(0.607 0.01639 168.32)",
+          "oklch(0.721 0.01639 168.32)",
+          "oklch(0.836 0.01639 168.32)",
+          "oklch(0.950 0.01639 168.32)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Light leaf",
+        "tonalRamp": [
+          "oklch(0.150 0.00827 157.09)",
+          "oklch(0.264 0.00827 157.09)",
+          "oklch(0.379 0.00827 157.09)",
+          "oklch(0.493 0.00827 157.09)",
+          "oklch(0.607 0.00827 157.09)",
+          "oklch(0.721 0.00827 157.09)",
+          "oklch(0.836 0.00827 157.09)",
+          "oklch(0.950 0.00827 157.09)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted leaf",
+        "tonalRamp": [
+          "oklch(0.150 0.03132 154.51)",
+          "oklch(0.264 0.03132 154.51)",
+          "oklch(0.379 0.03132 154.51)",
+          "oklch(0.493 0.03132 154.51)",
+          "oklch(0.607 0.03132 154.51)",
+          "oklch(0.721 0.03132 154.51)",
+          "oklch(0.836 0.03132 154.51)",
+          "oklch(0.950 0.03132 154.51)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Mint",
+        "tonalRamp": [
+          "oklch(0.150 0.08434 163.03)",
+          "oklch(0.264 0.08434 163.03)",
+          "oklch(0.379 0.08434 163.03)",
+          "oklch(0.493 0.08434 163.03)",
+          "oklch(0.607 0.08434 163.03)",
+          "oklch(0.721 0.08434 163.03)",
+          "oklch(0.836 0.08434 163.03)",
+          "oklch(0.950 0.08434 163.03)"
+        ]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Reminder amber",
+        "tonalRamp": [
+          "oklch(0.150 0.12296 81.91)",
+          "oklch(0.264 0.12296 81.91)",
+          "oklch(0.379 0.12296 81.91)",
+          "oklch(0.493 0.12296 81.91)",
+          "oklch(0.607 0.12296 81.91)",
+          "oklch(0.721 0.12296 81.91)",
+          "oklch(0.836 0.12296 81.91)",
+          "oklch(0.950 0.12296 81.91)"
+        ]
+      },
+      "danger": {
+        "role": "state",
+        "displayName": "Soft coral",
+        "tonalRamp": [
+          "oklch(0.150 0.07953 27.69)",
+          "oklch(0.264 0.07953 27.69)",
+          "oklch(0.379 0.07953 27.69)",
+          "oklch(0.493 0.07953 27.69)",
+          "oklch(0.607 0.07953 27.69)",
+          "oklch(0.721 0.07953 27.69)",
+          "oklch(0.836 0.07953 27.69)",
+          "oklch(0.950 0.07953 27.69)"
+        ]
+      },
+      "processing": {
+        "role": "state",
+        "displayName": "Cool slate",
+        "tonalRamp": [
+          "oklch(0.150 0.02998 241.72)",
+          "oklch(0.264 0.02998 241.72)",
+          "oklch(0.379 0.02998 241.72)",
+          "oklch(0.493 0.02998 241.72)",
+          "oklch(0.607 0.02998 241.72)",
+          "oklch(0.721 0.02998 241.72)",
+          "oklch(0.836 0.02998 241.72)",
+          "oklch(0.950 0.02998 241.72)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Forest divider",
+        "tonalRamp": [
+          "oklch(0.150 0.03457 154.01)",
+          "oklch(0.264 0.03457 154.01)",
+          "oklch(0.379 0.03457 154.01)",
+          "oklch(0.493 0.03457 154.01)",
+          "oklch(0.607 0.03457 154.01)",
+          "oklch(0.721 0.03457 154.01)",
+          "oklch(0.836 0.03457 154.01)",
+          "oklch(0.950 0.03457 154.01)"
+        ]
+      },
+      "button-border": {
+        "role": "neutral",
+        "displayName": "Control stroke",
+        "tonalRamp": [
+          "oklch(0.150 0.03209 153.15)",
+          "oklch(0.264 0.03209 153.15)",
+          "oklch(0.379 0.03209 153.15)",
+          "oklch(0.493 0.03209 153.15)",
+          "oklch(0.607 0.03209 153.15)",
+          "oklch(0.721 0.03209 153.15)",
+          "oklch(0.836 0.03209 153.15)",
+          "oklch(0.950 0.03209 153.15)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Main focus countdown; tabular figures."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles; 26px in the narrow browser preview."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings; settings and dialogs have larger variants."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Root text size and paragraph line height."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Main button labels; primary weight is 600."
+      },
+      "transcript": {
+        "displayName": "Transcript",
+        "purpose": "Latest transcript text, preserving whitespace."
+      },
+      "island-display": {
+        "displayName": "Island Display",
+        "purpose": "Expanded island countdown; tabular figures."
+      },
+      "compact-label": {
+        "displayName": "Compact Label",
+        "purpose": "Island tabs and compact controls."
+      }
+    },
+    "shadows": [
+      {
+        "name": "dialog",
+        "value": "0 12px 36px #0008",
+        "purpose": "Centered modal above the dark backdrop."
+      },
+      {
+        "name": "toast",
+        "value": "0 8px 24px #0006",
+        "purpose": "Transient main-window feedback."
+      },
+      {
+        "name": "island-toast",
+        "value": "0 4px 12px #0006",
+        "purpose": "Feedback within the expanded island."
+      }
+    ],
+    "motion": [
+      {
+        "name": "island-resize",
+        "value": "180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Native island visible frame width and height transition."
+      },
+      {
+        "name": "waveform",
+        "value": "75ms ease-out",
+        "purpose": "Live SVG bar height and vertical position."
+      },
+      {
+        "name": "switch",
+        "value": "130ms ease-out",
+        "purpose": "Checked thumb translation."
+      },
+      {
+        "name": "loading-spin",
+        "value": "1s linear infinite",
+        "purpose": "Preparation and refresh icon rotation."
+      },
+      {
+        "name": "reminder-peek",
+        "value": "8000ms",
+        "purpose": "Reminder preview lifetime before collapsing."
+      },
+      {
+        "name": "insertion-success",
+        "value": "900ms",
+        "purpose": "Compact success feedback lifetime."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.001ms, 1 iteration",
+        "purpose": "Reduced animation and transition durations when prefers-reduced-motion is reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-controls",
+        "value": "1020px"
+      },
+      {
+        "name": "narrow-workspace",
+        "value": "800px"
+      },
+      {
+        "name": "icon-rail-preview",
+        "value": "540px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Implemented primary action; native disabled state and mint keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button-primary\">Start recording</button>",
+      "css": ".ds-button-primary{min-height:38px;border:1px solid var(--button-border);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 14px;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:13px;line-height:1.4;font-weight:500;white-space:nowrap;cursor:pointer;background:var(--accent);color:#10271b;border-color:var(--accent);font-weight:600} .ds-button-primary:hover:not(:disabled){background:#a0ddbf;border-color:#a0ddbf;} .ds-button-primary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;} .ds-button-primary:disabled{opacity:.58;cursor:not-allowed;}"
+    },
+    {
+      "name": "Default button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Implemented default action; native disabled state and mint keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button-default\">Open history</button>",
+      "css": ".ds-button-default{min-height:38px;border:1px solid var(--button-border);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 14px;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:13px;line-height:1.4;font-weight:500;white-space:nowrap;cursor:pointer;background:var(--surface);color:var(--text);border-color:var(--button-border);font-weight:500} .ds-button-default:hover:not(:disabled){background:#253b2f;border-color:#66796d;} .ds-button-default:focus-visible{outline:2px solid var(--accent);outline-offset:3px;} .ds-button-default:disabled{opacity:.58;cursor:not-allowed;}"
+    },
+    {
+      "name": "Danger button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Implemented danger action; native disabled state and mint keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button-danger\">Delete task</button>",
+      "css": ".ds-button-danger{min-height:38px;border:1px solid var(--button-border);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 14px;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:13px;line-height:1.4;font-weight:500;white-space:nowrap;cursor:pointer;background:#7a3535;color:#fff;border-color:#b35c5c;font-weight:500} .ds-button-danger:hover:not(:disabled){background:#253b2f;border-color:#66796d;} .ds-button-danger:focus-visible{outline:2px solid var(--accent);outline-offset:3px;} .ds-button-danger:disabled{opacity:.58;cursor:not-allowed;}"
+    },
+    {
+      "name": "Ghost button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Implemented ghost action; native disabled state and mint keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button-ghost\">Cancel</button>",
+      "css": ".ds-button-ghost{min-height:38px;border:1px solid var(--button-border);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 14px;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:13px;line-height:1.4;font-weight:500;white-space:nowrap;cursor:pointer;background:transparent;color:var(--text);border-color:transparent;font-weight:500} .ds-button-ghost:hover:not(:disabled){background:#253b2f;border-color:#66796d;} .ds-button-ghost:focus-visible{outline:2px solid var(--accent);outline-offset:3px;} .ds-button-ghost:disabled{opacity:.58;cursor:not-allowed;}"
+    },
+    {
+      "name": "Labeled field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Visible label, recessed field, and muted hint.",
+      "html": "<label class=\"ds-field\"><span>Session name</span><input value=\"Read for twenty minutes\" /><small>Name the activity you want to focus on.</small></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:7px;margin-bottom:17px;color:#d7e3db;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:13px}.ds-field input{border:1px solid var(--button-border);border-radius:5px;background:var(--input);color:var(--text);padding:10px 12px;min-height:39px;min-width:0;font:inherit;caret-color:var(--accent)}.ds-field input:focus-visible{outline:2px solid var(--accent);outline-offset:3px;outline-offset:1px}.ds-field input:disabled{opacity:.58;cursor:not-allowed}.ds-field small{font-size:12px;line-height:1.5;color:var(--muted)}"
+    },
+    {
+      "name": "Selected navigation",
+      "kind": "nav",
+      "refersTo": "navigation-selected",
+      "description": "Outline icon, written tool name, and mint selected edge.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main navigation\"><button type=\"button\" class=\"ds-nav-item\" aria-current=\"page\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2M12 19v3\"/></svg><span>Dictation</span></button></nav>",
+      "css": ".ds-nav{background:var(--rail);padding:10px;width:198px}.ds-nav-item{border:1px solid transparent;display:flex;align-items:center;gap:16px;min-height:39px;width:100%;padding:10px 14px;border-radius:6px;background:transparent;color:#cad6cf;text-align:left;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:14px;cursor:pointer}.ds-nav-item:hover{background:#22372c;color:white}.ds-nav-item[aria-current=\"page\"]{background:#294237;color:#f0f7f2;border-left:2px solid var(--accent);padding-left:13px}.ds-nav-item:focus-visible{outline:2px solid var(--accent);outline-offset:3px}"
+    },
+    {
+      "name": "Platform tag",
+      "kind": "chip",
+      "refersTo": "platform-tag",
+      "description": "Static contest source label, without action or selected behavior.",
+      "html": "<span class=\"ds-platform-tag\">Codeforces</span>",
+      "css": ".ds-platform-tag{display:inline-block;border:1px solid #50654e;background:#203829;color:#d8e7dc;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:11px;min-width:80px;text-align:center;border-radius:5px;padding:5px 7px}"
+    },
+    {
+      "name": "Working panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat bordered working group; no resting shadow.",
+      "html": "<section class=\"ds-panel\"><h2>Latest transcript</h2><p>Your completed words will appear here.</p></section>",
+      "css": ".ds-panel{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:20px;color:var(--text);font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif}.ds-panel h2{font-size:14px;font-weight:500;color:#c8d7ce;margin:0 0 11px}.ds-panel p{font-size:14px;line-height:1.6;color:var(--muted);margin:0}"
+    },
+    {
+      "name": "Labeled switch",
+      "kind": "input",
+      "description": "Native checkbox carrying the compact rounded switch treatment.",
+      "html": "<label class=\"ds-toggle\"><span>Alarm enabled</span><input class=\"ds-switch\" type=\"checkbox\" checked /></label>",
+      "css": ".ds-toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:39px;padding:8px 0;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:13px;color:#dce6df}.ds-switch{appearance:none;flex:0 0 32px;width:32px;height:19px;min-height:19px;border-radius:20px;border:1px solid #64796b;padding:2px;position:relative;background:#32483a;margin:0;cursor:pointer}.ds-switch::after{content:\"\";position:absolute;width:13px;height:13px;left:2px;top:2px;border-radius:50%;background:#d8e5dc;transition:transform 130ms ease-out}.ds-switch:checked{background:var(--accent);border-color:var(--accent)}.ds-switch:checked::after{transform:translateX(13px);background:#142a1e}.ds-switch:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}.ds-switch:disabled{opacity:.58;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-switch::after{transition-duration:.001ms}}"
+    },
+    {
+      "name": "Focus capsule",
+      "kind": "custom",
+      "refersTo": "island-capsule",
+      "description": "112 by 32 logical-pixel collapsed focus state, with a full accessible label. Native expansion is capped at 320 by 400.",
+      "html": "<button type=\"button\" class=\"ds-capsule\" aria-label=\"Read for twenty minutes, 18:42 remaining, running\"><span class=\"ds-mini-progress\" aria-hidden=\"true\"></span><span class=\"ds-numeric\">18:42</span></button>",
+      "css": ".ds-capsule{width:112px;height:32px;background:#0f1b18;border:1px solid #3c5547;border-radius:18px;padding:0 11px;display:flex;align-items:center;justify-content:center;gap:7px;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:12px;color:#e5f0e8;user-select:none;cursor:pointer}.ds-capsule:focus-visible{outline:2px solid var(--accent);outline-offset:3px;outline-offset:-3px}.ds-numeric{font-variant-numeric:tabular-nums}.ds-mini-progress{display:inline-flex;width:15px;height:15px;padding:3px;border-radius:50%;background:conic-gradient(var(--accent) 25%,#33483b 0);position:relative}.ds-mini-progress::before{content:\"\";position:absolute;inset:3px;background:#101914;border-radius:50%}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The compact voice utility",
+    "overview": "Forest-charcoal surfaces and mint actions make a quiet working canvas for local dictation and daily planning. Fine borders, readable lettering, and restrained amber reminders keep operational state easy to find. Controls are crisp and compact; content supplies the hierarchy without decorative imagery.\n\nThe approved replacement world is implemented in Tauri 2, React 19, and TypeScript. This document records `desktop/src/tokens.css`, `styles.css`, and the implemented components and pages. It supersedes the earlier light Qt design document. The selected composition remains in `.impeccable/surface-brief.md` and the approved mockups; implementation values govern this system.",
+    "keyCharacteristics": [
+      "Forest surfaces separated by fine borders and small tonal changes.",
+      "Mint primary actions, progress, and keyboard focus; amber reminder emphasis.",
+      "Locally bundled Encode Sans, sentence-case labels, and tabular countdowns.",
+      "Seven visible tools in a labeled rail and a separate contextual island.",
+      "Semantic controls, code-drawn SVG icons, and live waveform bars."
+    ],
+    "rules": [
+      {
+        "name": "The State Has Words Rule",
+        "body": "Keep recording, processing, error, and reminder meaning in visible text or accessible names alongside color and icons.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Use bundled Encode Sans for titles, controls, and numerals; apply tabular figures to durations and counts instead of changing font.",
+        "section": "typography"
+      },
+      {
+        "name": "The Bordered Surface Rule",
+        "body": "Separate resting groups with tonal fills and fine strokes; use the recorded shadows for transient layers.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use forest tonal layers and fine borders to group content.",
+      "Do keep mint actions and focus distinct from amber reminder emphasis.",
+      "Do use bundled Encode Sans and tabular figures for countdowns.",
+      "Do pair operational color and icons with written state or accessible names.",
+      "Do preserve the island's visible native footprint and scroll its expanded body.",
+      "Do keep reminders quiet while dictation is active and expose pending items afterward."
+    ],
+    "donts": [
+      "Don't inherit the superseded light Qt palette or Segoe-only typography.",
+      "Don't replace semantic controls, text, icons, or waveforms with raster screenshots.",
+      "Don't add decorative eyebrows above working headings or idle focus content.",
+      "Don't use ambient shadows on every resting panel.",
+      "Don't treat preview screenshots as proof of physical microphone, DPI, or screen-reader behavior."
+    ]
+  }
+}

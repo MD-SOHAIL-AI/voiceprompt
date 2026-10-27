@@ -1,9 +1,12 @@
 """The Python project version is canonical; reject stale release metadata."""
 import json
 import re
+import sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
+if sys.version_info < (3, 11):
+    raise SystemExit('Python 3.11 or newer is required for the patched build dependencies.')
 version = re.search(r'^version = "([^"]+)"', (root / 'pyproject.toml').read_text(), re.M)[1]
 files = {'desktop/package.json': json.loads((root / 'desktop/package.json').read_text())['version'],
          'desktop/src-tauri/tauri.conf.json': json.loads((root / 'desktop/src-tauri/tauri.conf.json').read_text())['version'],

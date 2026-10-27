@@ -1,5 +1,6 @@
 """Exercise the real source/frozen sidecar with disposable, credential-free data."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -7,9 +8,27 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def hold_instance(profile):
+    """Simulate an older tray instance using only a disposable profile's mutex."""
+    sys.path.insert(0, str(ROOT))
+    from voiceprompt.instance import SingleInstance
+    identity = hashlib.sha256(str(profile.resolve()).encode()).hexdigest()[:20]
+    ready = profile / '.instance-ready'
+    try:
+        with SingleInstance(name='Local\\VoicePrompt.Acceptance.' + identity) as instance:
+            assert not instance.already_running
+            ready.touch()
+            deadline = time.monotonic() + 90
+            while not (profile / '.instance-release').exists() and time.monotonic() < deadline:
+                time.sleep(0.1)
+    finally:
+        ready.unlink(missing_ok=True)
 
 
 class Client:
@@ -67,7 +86,11 @@ class Client:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--engine', type=Path)
+    parser.add_argument('--hold-instance', type=Path)
     args = parser.parse_args()
+    if args.hold_instance:
+        hold_instance(args.hold_instance)
+        return
     profile = ROOT / '.tools' / ('bridge-profile-' + uuid.uuid4().hex)
     subprocess.run([sys.executable, str(ROOT / 'scripts/create_acceptance_profile.py'), str(profile)], check=True)
     command = [str(args.engine.resolve()), '--desktop-sidecar'] if args.engine else [sys.executable, '-u', '-m', 'voiceprompt.desktop_sidecar']
@@ -77,6 +100,15 @@ def main():
         assert state['version'] == 1 and state['runtime']['acceptanceProfile']
         assert state['credentials'] == {'gemini': False, 'openrouter': False}
         assert state['planner'] is not None, state['runtime']['plannerError']
+        if os.name == 'nt':
+            duplicate = subprocess.run(command, cwd=ROOT,
+                env=dict(os.environ, VOICEPROMPT_ACCEPTANCE_DIR=str(profile)),
+                input=b'', capture_output=True, timeout=30, creationflags=0x08000000)
+            assert duplicate.returncode == 1, 'A duplicate engine acquired the same profile'
+            events = [json.loads(line) for line in duplicate.stdout.splitlines()]
+            assert any(event.get('event') == 'fatal' and 'system tray' in event['payload']['message']
+                       for event in events), 'Duplicate engine did not explain how to recover'
+            assert client.request('bootstrap')['version'] == 1, 'Duplicate launch affected the active engine'
         client.request('planner.task.save', title='Persistent bridge task', notes='Disposable integration fixture')
         client.request('planner.timer.start', title='Bridge timer', seconds=120)
         timer = client.request('planner.snapshot')['timer']
@@ -107,7 +139,8 @@ def main():
         restarted.close()
     result = {'mode': 'frozen' if args.engine else 'source', 'passed': True,
               'checks': ['Real bootstrap', 'Credential isolation', 'Task persistence after restart',
-                         'Timer pause/resume/end', 'Stale action rejection', 'Graceful shutdown']}
+                         'Timer pause/resume/end', 'Stale action rejection', 'Graceful shutdown',
+                         'Duplicate engine conflict and recovery guidance']}
     (ROOT / 'build').mkdir(exist_ok=True)
     (ROOT / 'build' / ('frozen-bridge.json' if args.engine else 'source-bridge.json')).write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(result, indent=2))

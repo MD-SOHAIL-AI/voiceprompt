@@ -75,13 +75,27 @@ export function useBackend() {
       if (closed) dispose();
       else disposals.push(dispose);
     };
+    let hydration = 0;
     const hydrate = async () => {
-      try {
-        const value = await request<Bootstrap>("bootstrap");
-        if (!closed) useApp.getState().hydrate(value);
-      } catch (error) {
-        if (!closed)
-          useApp.setState({ error: String(error), connected: false });
+      const generation = ++hydration;
+      for (let attempt = 0; !closed && generation === hydration; attempt++) {
+        try {
+          const value = await request<Bootstrap>("bootstrap");
+          if (!closed && generation === hydration)
+            useApp.getState().hydrate(value);
+          return;
+        } catch (error) {
+          if (
+            String(error) === "The voice engine is starting. Please wait." &&
+            attempt < 24
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            continue;
+          }
+          if (!closed && generation === hydration)
+            useApp.setState({ error: String(error), connected: false });
+          return;
+        }
       }
     };
     void (async () => {

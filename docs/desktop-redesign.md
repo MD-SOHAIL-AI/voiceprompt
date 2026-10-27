@@ -52,6 +52,14 @@ later island concept is authoritative for floating controls.
 
 ## Validation evidence and limits
 
+Startup conflict regression: an older installed tray instance can hold the
+voice-engine mutex while the new desktop opens. The bridge now retains the
+specific fatal reason across EOF and late bootstrap requests, with instructions
+to quit the other tray instance and select Restart engine. Process-launch errors
+are retained separately from the brief initial startup state. Native verification
+holds an isolated competing mutex, checks the persistent explanation, releases
+it, then restarts the engine and verifies planner data survives another restart.
+
 Machine-readable reports are generated under `build/`, with screenshots under
 `.impeccable/review/`. Windows CI uploads these as workflow artifacts. The tests
 cover protocol bounds/order, state guards, persistent reminder delivery, alarm

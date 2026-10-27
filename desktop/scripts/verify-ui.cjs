@@ -121,6 +121,30 @@ async function expand(tab) {
   }
   const errors = [];
   main.on("pageerror", (error) => errors.push(error.message));
+  if (native && process.argv.includes("--expect-instance-conflict")) {
+    const notice = main.locator(".notice.danger");
+    await expect(notice).toContainText(
+      "Another VoicePrompt instance is running",
+      { timeout: 30000 },
+    );
+    // EOF must not replace the recovery guidance with the generic stopped error.
+    await wait(500);
+    await expect(notice).toContainText("system tray");
+    const profile = process.env.VOICEPROMPT_ACCEPTANCE_DIR;
+    assert(profile, "Conflict verification requires an isolated profile");
+    fs.writeFileSync(path.join(profile, ".instance-release"), "");
+    await until(
+      () => !fs.existsSync(path.join(profile, ".instance-ready")),
+      5000,
+    );
+    await main
+      .getByRole("button", { name: "Restart engine", exact: true })
+      .click();
+    await expect(notice).toHaveCount(0, { timeout: 30000 });
+    report.checks.push(
+      "Older tray instance shows persistent recovery guidance; Restart engine recovers after it quits",
+    );
+  }
   await expect(
     main.getByRole("heading", { name: "Dictation", exact: true }),
   ).toBeVisible({ timeout: 60000 });
@@ -334,6 +358,29 @@ async function expand(tab) {
     );
     const state = await rpc("planner.snapshot");
     assert(state.tasks.some((t) => t.notes === "Persistent verification note"));
+    await main.evaluate(() =>
+      window.__TAURI_INTERNALS__.invoke("restart_engine"),
+    );
+    await expect
+      .poll(
+        async () => {
+          try {
+            return (await rpc("bootstrap")).version;
+          } catch {
+            return 0;
+          }
+        },
+        { timeout: 30000 },
+      )
+      .toBe(1);
+    await expect(main.locator(".notice.danger")).toHaveCount(0);
+    const restarted = await rpc("planner.snapshot");
+    assert(
+      restarted.tasks.some((t) => t.notes === "Persistent verification note"),
+    );
+    report.checks.push(
+      "Engine restart reconnects the native interface and preserves planner data",
+    );
   } else {
     island = await main.context().newPage();
     await island.setViewportSize({ width: 320, height: 400 });

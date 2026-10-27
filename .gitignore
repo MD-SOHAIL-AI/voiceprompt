@@ -1,6 +1,27 @@
+# Local secrets and credentials. Published source is not hidden by ignore rules.
 .env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.*.example
+.secrets/
+secrets/
+credentials.json
+credentials.local.json
+*.credentials.json
+client_secret*.json
+service-account*.json
+*.pem
+*.key
+*.p8
+*.jks
+*.keystore
+
+# Python environments and caches.
 .venv/
 .venv311/
+.venv*/
 venv/
 env/
 __pycache__/
@@ -28,3 +49,27 @@ desktop/*.tsbuildinfo
 .impeccable/build/
 .impeccable/review/
 .impeccable/mocks/
+
+# Local user data, diagnostics, recordings and backups.
+config.local.json
+config.private.json
+history.json
+performance.jsonl
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
+*.log
+*.bak
+*.backup
+/local-data/
+/recordings/
+/transcripts/
+/models/
+/runtimes/
+/backups/
+
+# Dependencies installed outside the desktop package.
+node_modules/

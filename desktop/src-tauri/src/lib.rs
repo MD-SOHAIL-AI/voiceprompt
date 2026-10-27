@@ -507,12 +507,37 @@ fn island_view(
     #[cfg(windows)]
     if mode != "expanded" {
         let own = window.hwnd().map(|handle| handle.0 as isize).unwrap_or(0);
+        let previous = state.previous_focus.lock().map(|saved| *saved).unwrap_or(0);
+        let main = app
+            .get_webview_window("main")
+            .filter(|main| main.is_visible().unwrap_or(false));
+        let fallback = main
+            .and_then(|main| main.hwnd().ok())
+            .map(|handle| handle.0 as isize)
+            .unwrap_or(0);
         window
             .run_on_main_thread(move || unsafe {
                 use windows_sys::Win32::UI::{
                     Input::KeyboardAndMouse::{GetFocus, SetFocus},
-                    WindowsAndMessaging::IsChild,
+                    WindowsAndMessaging::{
+                        GetForegroundWindow, GetShellWindow, IsChild, IsWindow, SetForegroundWindow,
+                    },
                 };
+                // A WebView can reactivate its frame during show/resize. Restore
+                // the destination after those operations as well as before them.
+                if GetForegroundWindow() as isize == own {
+                    let target = if previous != 0 && previous != own && IsWindow(previous as _) != 0
+                    {
+                        previous
+                    } else if fallback != 0 {
+                        fallback
+                    } else {
+                        GetShellWindow() as isize
+                    };
+                    if target != 0 && target != own {
+                        SetForegroundWindow(target as _);
+                    }
+                }
                 let focused = GetFocus();
                 if own != 0 && (focused as isize == own || IsChild(own as _, focused) != 0) {
                     SetFocus(std::ptr::null_mut());

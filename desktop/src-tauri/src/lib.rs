@@ -596,6 +596,7 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
         .get_webview_window("overlay")
         .ok_or("Island unavailable.")?;
     let reported = window.is_focused().unwrap_or(false);
+    let visible = window.is_visible().unwrap_or(false);
     #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -610,7 +611,7 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
         info.cbSize = std::mem::size_of_val(&info) as u32;
         let gui_available = GetGUIThreadInfo(0, &mut info) != 0;
         Ok(
-            json!({"reportedFocused":reported, "foreground":GetForegroundWindow() == own,
+            json!({"visible":visible, "reportedFocused":reported, "foreground":GetForegroundWindow() == own,
             "keyboardFocus":gui_available && (info.hwndFocus == own || IsChild(own, info.hwndFocus) != 0),
             "nonActivating":GetWindowLongPtrW(own, GWL_EXSTYLE) & WS_EX_NOACTIVATE as isize != 0,
             "guiAvailable":gui_available}),
@@ -618,7 +619,7 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
     }
     #[cfg(not(windows))]
     Ok(
-        json!({"reportedFocused":reported, "foreground":reported, "keyboardFocus":reported, "nonActivating":!reported}),
+        json!({"visible":visible, "reportedFocused":reported, "foreground":reported, "keyboardFocus":reported, "nonActivating":!reported}),
     )
 }
 

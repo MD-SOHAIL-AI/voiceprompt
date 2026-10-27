@@ -398,6 +398,15 @@ async function expand(tab) {
     ).toBeVisible();
     await shot(island, "island-notifications");
   }
+  await require("./verify-appearance.cjs")({
+    main,
+    island,
+    native,
+    rpc,
+    report,
+    shot,
+    expand,
+  });
   if (!native) {
     await main.setViewportSize({ width: 800, height: 560 });
     await navigate("Dictation");

@@ -8,13 +8,20 @@ Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete reco
 
 Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
-This branch contains the 0.5.0 desktop redesign. It is validated through pull-request artifacts before publication; a main-branch merge does not publish a release. Existing downloadable releases may use the previous interface. Models download separately on first preparation; cached models work offline. Unsigned builds are identified as unsigned.
+This branch contains the 0.5.1 desktop redesign. It is validated through pull-request artifacts before publication; a main-branch merge does not publish a release. Existing downloadable releases may use the previous interface. Models download separately on first preparation; cached models work offline. Unsigned builds are identified as unsigned.
 
 Uninstall from **Windows Settings → Apps → Installed apps → VoicePrompt**. The uninstaller closes the installed app and speech workers, removes installed files, shortcuts, and VoicePrompt startup entries, and keeps your settings, history, tasks, and shared model cache. A downloaded installer or a developer's source/build folders remain until you remove them yourself. The `Uninstall VoicePrompt Startup.bat` file only disables automatic startup; it does not uninstall the app.
 
 If you used the 0.4.0 uninstaller while VoicePrompt was running and files remain, install 0.4.1 into the same folder, then uninstall again. This repairs the installation record so the fixed uninstaller can remove those files.
 
 ## Voice typing
+
+In **Settings → Appearance**, choose Light, Dark, or System brightness and a
+Forest, Graphite, Ocean, Lavender, or Sand color theme. Changes save automatically
+and update both windows. **Show floating island** hides or reveals it;
+**Keep island visible** keeps it available while idle. The pin button in the
+expanded island offers the same control. With pinning off, active recordings,
+timers, alarms and pending reminders still keep the island visible.
 
 1. Choose a microphone, use **Check microphone**, then select **Prepare model and microphone**.
 2. Wait for **Ready to dictate**.

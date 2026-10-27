@@ -13,7 +13,7 @@ colors:
   danger: "#eba9a0"
   processing: "#a7bac9"
   border: "#35493b"
-  button-border: "#506355"
+  button-border: "#6a8073"
 typography:
   display:
     fontFamily: "Encode Sans, Segoe UI, system-ui, sans-serif"
@@ -151,7 +151,9 @@ The approved replacement world is implemented in Tauri 2, React 19, and TypeScri
 
 ## Colors
 
-The palette is a dark forest neutral family with one mint action accent and restrained colors for reminders and operational state. The frontmatter preserves the canonical CSS hex values.
+The default palette is a dark forest neutral family with one mint action accent and restrained colors for reminders and operational state. The frontmatter preserves its canonical CSS hex values. Settings also offers Graphite, Ocean, Lavender and Sand. Each palette has authored light and dark variants in `desktop/src/tokens.css`; System brightness follows the Windows preference. Semantic roles stay consistent across palettes: action and focus use `accent`, reminders use `amber`, and failures use `danger`. Colored action fills pair with `accent-ink`; text, borders, selection, native input appearance and the island follow the active variant.
+
+Appearance controls use labeled native radio groups with visible checked and keyboard-focus states. Changes apply immediately, save independently from speech settings in the versioned WebView preferences, and synchronize between the main window and island. The existing dark Forest appearance remains the upgrade default. Show floating island disables the surface; Keep island visible pins its compact idle state without taking keyboard focus. The expanded island exposes the same pin control.
 
 ### Primary
 
@@ -283,7 +285,7 @@ Current native test results and CI status belong in the `build/` reports, with t
 
 ### Don't:
 
-- **Don't** inherit the superseded light Qt palette or Segoe-only typography.
+- **Don't** inherit legacy Qt styling or replace the bundled typography when changing brightness.
 - **Don't** replace semantic controls, text, icons, or waveforms with raster screenshots.
 - **Don't** add decorative eyebrows above working headings or idle focus content.
 - **Don't** use ambient shadows on every resting panel.

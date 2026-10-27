@@ -75,6 +75,14 @@ tests. Unsigned artifacts remain unsigned; no publisher identity is generated.
 
 ## Development tools
 
+Version 0.5.1 adds five coordinated palettes in both light and dark, System
+brightness, and persistent Show floating island / Keep island visible controls.
+Appearance is independent of the speech engine, so changing a theme never warms
+a model or interrupts recording. Preferences synchronize across both WebViews.
+Automated verification checks ten variants for text/control contrast and serious
+accessibility failures, saved choices, live system changes, cross-window pinning,
+and native visibility without taking foreground or keyboard focus.
+
 The dependency audit prompted a Python 3.11 build floor: patched filelock 4.2.4
 and Pillow 13 require it. Certifi was updated to 2026.10.23. The previous Python
 3.10 local environment is preserved; packaged users receive the new interpreter.

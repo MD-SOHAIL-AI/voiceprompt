@@ -9,6 +9,8 @@ import {
   ExternalLink,
   LoaderCircle,
   Pause,
+  Pin,
+  PinOff,
   Plus,
   Timer,
   Trophy,
@@ -23,11 +25,14 @@ import { AlarmEditor, TimerComposer, TimerControls } from "../pages/Planner";
 import { NotificationList, noticeDescription } from "./Notifications";
 import { Button, Empty, Toggle, WaveMark, useAction } from "./ui";
 import { Waveform } from "./Waveform";
+import { updatePreferences, usePreferences } from "../lib/preferences";
 
 type Tab = "Focus" | "Alarms" | "Notifications";
 type View = "compact" | "expanded" | "peek";
 export function Island() {
   useBackend();
+  const enabled = usePreferences((p) => p.islandEnabled);
+  const pinned = usePreferences((p) => p.islandPinned);
   const runtime = useApp((s) => s.runtime),
     hub = useApp((s) => s.planner),
     meter = useApp((s) => s.meter),
@@ -94,7 +99,7 @@ export function Island() {
   }, [deferred]);
 
   useEffect(() => {
-    if (view !== "compact" || !connected) return;
+    if (view !== "compact" || !connected || !enabled) return;
     const candidates = unseenNotices(hub, deferred).filter(
       (n) => !presented.current.has(`${n.id}:${n.revision}`),
     );
@@ -103,16 +108,25 @@ export function Island() {
     showing.current = candidates;
     setPeek(candidates[0]);
     setView("peek");
-  }, [hub, deferred, view, connected]);
+  }, [hub, deferred, view, connected, enabled]);
   useEffect(() => {
-    if (view !== "peek") return;
+    if (enabled) return;
+    showing.current.forEach((n) =>
+      presented.current.delete(`${n.id}:${n.revision}`),
+    );
+    showing.current = [];
+    setView("compact");
+    setPeek(null);
+  }, [enabled]);
+  useEffect(() => {
+    if (view !== "peek" || !enabled) return;
     const timer = setTimeout(() => {
       markPresented();
       setPeek(null);
       setView("compact");
     }, 8000);
     return () => clearTimeout(timer);
-  }, [view]);
+  }, [view, enabled]);
   useEffect(() => {
     if (
       !runtime ||
@@ -139,7 +153,12 @@ export function Island() {
     return () => clearTimeout(timer);
   }, [success]);
   const visible =
-    kind !== "hidden" || view === "expanded" || view === "peek" || success;
+    enabled &&
+    (pinned ||
+      kind !== "hidden" ||
+      view === "expanded" ||
+      view === "peek" ||
+      success);
   useEffect(() => {
     if (!settings) return;
     let cancelled = false;
@@ -234,7 +253,9 @@ export function Island() {
           ? `Listening. ${pending} pending reminders.`
           : kind === "error"
             ? "VoicePrompt needs attention"
-            : `${pending} pending reminders`;
+            : pending
+              ? `${pending} pending reminders`
+              : "VoicePrompt ready. Open floating controls";
   return (
     <div
       className={`island-frame view-${view} ${kind === "recording" ? "is-listening" : ""}`}
@@ -325,10 +346,15 @@ export function Island() {
                 {countdown(hub.nextAlarm.due - hub.now)}
               </span>
             </>
-          ) : (
+          ) : pending ? (
             <>
               <Bell size={15} />
               <span>{pending} pending</span>
+            </>
+          ) : (
+            <>
+              <WaveMark size={16} />
+              <span>Ready</span>
             </>
           )}
           {pending > 0 && kind !== "notifications" && (
@@ -376,6 +402,20 @@ export function Island() {
           <header className="island-header">
             <WaveMark size={20} />
             <strong>VoicePrompt</strong>
+            <Button
+              tone="ghost"
+              className="island-pin"
+              aria-label="Keep island visible"
+              aria-pressed={pinned}
+              title={
+                pinned
+                  ? "Unpin: hide automatically when idle"
+                  : "Pin: keep visible when idle"
+              }
+              onClick={() => updatePreferences({ islandPinned: !pinned })}
+            >
+              {pinned ? <PinOff size={15} /> : <Pin size={15} />}
+            </Button>
             <Button
               tone="ghost"
               aria-label="Collapse island"

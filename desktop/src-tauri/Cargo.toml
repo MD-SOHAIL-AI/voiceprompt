@@ -1,6 +1,6 @@
 [package]
 name = "voiceprompt-desktop"
-version = "0.5.0"
+version = "0.5.1"
 description = "Local voice typing and daily focus tools"
 authors = ["VoicePrompt contributors"]
 edition = "2021"

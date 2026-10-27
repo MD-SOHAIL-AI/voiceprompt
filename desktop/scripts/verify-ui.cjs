@@ -318,14 +318,17 @@ async function expand(tab) {
       }),
     );
     await expect
-      .poll(() =>
-        main.evaluate(() =>
-          window.__TAURI_INTERNALS__.invoke("plugin:window|is_focused", {
-            label: "overlay",
-          }),
-        ),
-      )
-      .toBe(false);
+      .poll(async () => {
+        report.islandFocus = await main.evaluate(() =>
+          window.__TAURI_INTERNALS__.invoke("island_status"),
+        );
+        return (
+          !report.islandFocus.foreground &&
+          !report.islandFocus.keyboardFocus &&
+          report.islandFocus.nonActivating
+        );
+      })
+      .toBe(true);
     report.checks.push(
       "Contest and task reminders reach native island; snooze and nonactivating compact state verified",
     );

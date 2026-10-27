@@ -40,6 +40,9 @@ later island concept is authoritative for floating controls.
   Contest advance and start reminders are distinct, deduplicated stages.
 - Editing disabled alarms preserves their disabled status. History deletion uses
   stable identifiers for old entries and atomic storage updates.
+- Native date/time inputs now accept the HTML separator when saving alarms and
+  task reminders. Migration backups explicitly close their SQLite connection,
+  preventing Windows from retaining a file lock after restart.
 - Optional planner corruption leaves dictation available with an explicit error.
 - Native startup points to the desktop executable. Quit and uninstall contain
   and stop the engine process tree, matching installed paths only.

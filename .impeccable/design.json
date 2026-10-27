@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T00:08:09.858898Z",
+  "generatedAt": "2026-10-27T00:23:42.727223Z",
   "title": "Design System: VoicePrompt",
   "extensions": {
     "colorMeta": {
@@ -352,7 +352,7 @@
       "name": "Focus capsule",
       "kind": "custom",
       "refersTo": "island-capsule",
-      "description": "112 by 32 logical-pixel collapsed focus state, with a full accessible label. Native expansion is capped at 320 by 400.",
+      "description": "112 by 32 logical-pixel collapsed focus state, with a full accessible label. Native expansion is capped at 320 by 400, remembers the preceding foreground app, and restores it on collapse; compact and peek do not request activation.",
       "html": "<button type=\"button\" class=\"ds-capsule\" aria-label=\"Read for twenty minutes, 18:42 remaining, running\"><span class=\"ds-mini-progress\" aria-hidden=\"true\"></span><span class=\"ds-numeric\">18:42</span></button>",
       "css": ".ds-capsule{width:112px;height:32px;background:#0f1b18;border:1px solid #3c5547;border-radius:18px;padding:0 11px;display:flex;align-items:center;justify-content:center;gap:7px;font-family:\"Encode Sans\",\"Segoe UI\",system-ui,sans-serif;font-size:12px;color:#e5f0e8;user-select:none;cursor:pointer}.ds-capsule:focus-visible{outline:2px solid var(--accent);outline-offset:3px;outline-offset:-3px}.ds-numeric{font-variant-numeric:tabular-nums}.ds-mini-progress{display:inline-flex;width:15px;height:15px;padding:3px;border-radius:50%;background:conic-gradient(var(--accent) 25%,#33483b 0);position:relative}.ds-mini-progress::before{content:\"\";position:absolute;inset:3px;background:#101914;border-radius:50%}"
     }

@@ -426,14 +426,14 @@ fn island_view(
             GetForegroundWindow, IsWindow, SetForegroundWindow,
         };
         let own = window.hwnd().map(|handle| handle.0 as isize).unwrap_or(0);
-        if mode == "expanded" && focus && !window.is_focused().unwrap_or(false) {
+        if mode == "expanded" && focus {
             let previous = GetForegroundWindow() as isize;
             if previous != 0 && previous != own {
                 if let Ok(mut saved) = state.previous_focus.lock() {
                     *saved = previous;
                 }
             }
-        } else if mode != "expanded" && window.is_focused().unwrap_or(false) {
+        } else if mode != "expanded" && GetForegroundWindow() as isize == own {
             let previous = state.previous_focus.lock().map(|saved| *saved).unwrap_or(0);
             if previous != 0 && previous != own && IsWindow(previous as _) != 0 {
                 if SetForegroundWindow(previous as _) == 0 {
@@ -504,7 +504,55 @@ fn island_view(
     if focus && mode == "expanded" {
         let _ = window.set_focus();
     }
+    #[cfg(windows)]
+    if mode != "expanded" {
+        let own = window.hwnd().map(|handle| handle.0 as isize).unwrap_or(0);
+        window
+            .run_on_main_thread(move || unsafe {
+                use windows_sys::Win32::UI::{
+                    Input::KeyboardAndMouse::{GetFocus, SetFocus},
+                    WindowsAndMessaging::IsChild,
+                };
+                let focused = GetFocus();
+                if own != 0 && (focused as isize == own || IsChild(own as _, focused) != 0) {
+                    SetFocus(std::ptr::null_mut());
+                }
+            })
+            .map_err(|_| "Cannot release the island keyboard focus.".to_string())?;
+    }
     Ok(())
+}
+
+#[tauri::command]
+fn island_status(app: AppHandle) -> Result<Value, String> {
+    let window = app
+        .get_webview_window("overlay")
+        .ok_or("Island unavailable.")?;
+    let reported = window.is_focused().unwrap_or(false);
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetForegroundWindow, GetGUIThreadInfo, GetWindowLongPtrW, IsChild, GUITHREADINFO,
+            GWL_EXSTYLE, WS_EX_NOACTIVATE,
+        };
+        let own = window
+            .hwnd()
+            .map_err(|_| "Island unavailable.".to_string())?
+            .0 as _;
+        let mut info: GUITHREADINFO = std::mem::zeroed();
+        info.cbSize = std::mem::size_of_val(&info) as u32;
+        let gui_available = GetGUIThreadInfo(0, &mut info) != 0;
+        return Ok(
+            json!({"reportedFocused":reported, "foreground":GetForegroundWindow() == own,
+            "keyboardFocus":gui_available && (info.hwndFocus == own || IsChild(own, info.hwndFocus) != 0),
+            "nonActivating":GetWindowLongPtrW(own, GWL_EXSTYLE) & WS_EX_NOACTIVATE as isize != 0,
+            "guiAvailable":gui_available}),
+        );
+    }
+    #[cfg(not(windows))]
+    Ok(
+        json!({"reportedFocused":reported, "foreground":reported, "keyboardFocus":reported, "nonActivating":!reported}),
+    )
 }
 
 #[tauri::command]
@@ -662,6 +710,7 @@ pub fn run() {
             open_main,
             open_link,
             island_view,
+            island_status,
             restore_island,
             remember_island,
             quit_app

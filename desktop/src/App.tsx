@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   AlarmClock,
   Bell,
@@ -33,8 +33,11 @@ export default function App() {
     connected = useApp((s) => s.connected),
     toast = useApp((s) => s.toast);
   const count = useApp((s) => s.planner?.pendingCount ?? 0);
-  const [inbox, setInbox] = useState(false);
-  useEffect(() => { document.getElementById("main-content")?.scrollTo({ top: 0 }); }, [page]);
+  const inbox = useApp((s) => s.inboxOpen);
+  const setInbox = (inboxOpen: boolean) => useApp.setState({ inboxOpen });
+  useEffect(() => {
+    document.getElementById("main-content")?.scrollTo({ top: 0 });
+  }, [page]);
   if (!isNative() && !isPreview())
     return (
       <main className="launch-screen">

@@ -563,7 +563,7 @@ export function Island() {
                       ? "Focus timer"
                       : tab === "Alarms"
                         ? "Alarms"
-                        : "Contests",
+                        : "Notifications",
                 });
               }}
             >

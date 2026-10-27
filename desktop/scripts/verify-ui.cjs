@@ -37,8 +37,14 @@ async function shot(page, name) {
   const filename = path.join(out, `${native ? "native-" : ""}${name}.png`);
   const pixels = await page.screenshot();
   for (let attempt = 0; ; attempt++) {
-    try { fs.writeFileSync(filename, pixels); break; }
-    catch (error) { if (attempt >= 12 || !["UNKNOWN", "EBUSY", "EPERM"].includes(error.code)) throw error; await wait(300); }
+    try {
+      fs.writeFileSync(filename, pixels);
+      break;
+    } catch (error) {
+      if (attempt >= 12 || !["UNKNOWN", "EBUSY", "EPERM"].includes(error.code))
+        throw error;
+      await wait(300);
+    }
   }
   report.screenshots.push(path.relative(root, filename));
 }
@@ -229,7 +235,10 @@ async function expand(tab) {
     .getByRole("button", { name: "End session", exact: true })
     .click();
   await expect(
-    main.getByText("Ready when you are", { exact: true }),
+    main.getByRole("heading", {
+      name: "Give one activity your attention",
+      exact: true,
+    }),
   ).toBeVisible();
   report.checks.push(
     native
@@ -327,6 +336,7 @@ async function expand(tab) {
     await expect(
       island.getByRole("tab", { name: "Focus", exact: true }),
     ).toBeVisible();
+    await expect(island.locator(".next-alarm")).toBeInViewport({ ratio: 1 });
     await shot(island, "island-focus");
     await island.getByRole("tab", { name: /^Notifications/ }).click();
     await expect(

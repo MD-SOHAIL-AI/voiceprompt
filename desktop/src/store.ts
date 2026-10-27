@@ -20,6 +20,7 @@ interface Store {
   toast: string;
   mutation: number;
   focusTask: Task | null;
+  inboxOpen: boolean;
   hydrate: (value: Bootstrap) => void;
   setPage: (page: Page) => void;
 }
@@ -35,6 +36,7 @@ export const useApp = create<Store>((set) => ({
   toast: "",
   mutation: 0,
   focusTask: null,
+  inboxOpen: false,
   hydrate: (value) =>
     set({
       data: value,

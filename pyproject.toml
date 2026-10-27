@@ -7,7 +7,7 @@ name = "voiceprompt-desktop"
 version = "0.5.0"
 description = "Local Windows voice typing and daily focus tools"
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.13"
 license = "MIT"
 dynamic = ["dependencies"]
 

@@ -47,10 +47,10 @@ History contains transcript text on this device. Set its limit to zero to disabl
 
 ## Run from source
 
-Use 64-bit Python 3.10 on Windows for the validated build environment:
+Use 64-bit Python 3.11 on Windows for the build environment:
 
 ```powershell
-python -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements-lock.txt
 cd desktop
 npm ci

@@ -127,6 +127,8 @@ export function useBackend() {
         });
         await add("navigate", (value) => {
           const page = (value as { page: Page }).page;
+          if (String(page) === "Notifications")
+            useApp.setState({ inboxOpen: true });
           if (pages.includes(page)) navigate(page);
         });
       }

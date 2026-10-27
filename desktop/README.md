@@ -6,20 +6,21 @@ through bounded, versioned JSON lines. No HTTP speech server is started.
 
 ## Development
 
-Use Windows x64, Python 3.10, Node 24, Rust stable with Microsoft C++ Build Tools
+Use Windows x64, Python 3.11, Node 24, Rust stable with Microsoft C++ Build Tools
 and a Windows SDK, plus the Microsoft WebView2 Runtime.
 
 ```powershell
 # Repository root
-python -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements-lock.txt
 cd desktop
 npm ci
 npm run tauri -- dev
 ```
 
-Debug builds select `.venv/Scripts/python.exe` from the source root, falling back
-to `python`. Packaged builds use only `engine/VoicePromptEngine.exe` next to the
+Debug builds select `.venv311/Scripts/python.exe` when present (to preserve older
+local environments), then `.venv/Scripts/python.exe`, falling back to `python`.
+Packaged builds use only `engine/VoicePromptEngine.exe` next to the
 native executable. Arbitrary engine executable overrides are unsupported.
 
 For browser-only layout development, use `npm run dev` and open

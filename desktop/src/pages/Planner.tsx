@@ -542,11 +542,11 @@ export function FocusPage() {
         <h1>Focus timer</h1>
       </header>
       <div className="focus-session panel">
-        <span className="muted">
-          {active
-            ? `${timer.phase.replaceAll("_", " ")} · ${timer.status}`
-            : "Ready when you are"}
-        </span>
+        {active && (
+          <p className="muted">
+            {timer.phase.replaceAll("_", " ")} · {timer.status}
+          </p>
+        )}
         <h2>{active ? timer.title : "Give one activity your attention"}</h2>
         <div
           className="timer-digits numeric"

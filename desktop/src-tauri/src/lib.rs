@@ -180,7 +180,12 @@ fn spawn_engine(app: &AppHandle) -> Result<Arc<Engine>, String> {
             .parent()
             .and_then(|p| p.parent())
             .ok_or("Source directory is unavailable.")?;
-        let python = root.join(".venv/Scripts/python.exe");
+        let python311 = root.join(".venv311/Scripts/python.exe");
+        let python = if python311.is_file() {
+            python311
+        } else {
+            root.join(".venv/Scripts/python.exe")
+        };
         command = Command::new(if python.is_file() {
             python
         } else {
@@ -512,6 +517,27 @@ fn quit_app(app: AppHandle) {
 
 pub fn run() {
     let smoke = std::env::args().any(|arg| arg == "--smoke-test");
+    let mut context = tauri::generate_context!();
+    let acceptance = std::env::var_os("VOICEPROMPT_ACCEPTANCE_DIR")
+        .map(std::path::PathBuf::from)
+        .filter(|path| path.is_absolute());
+    for window in &mut context.config_mut().app.windows {
+        window.devtools = Some(false);
+        if let Some(profile) = &acceptance {
+            window.data_directory = Some(profile.join("webview"));
+            if let Ok(port) = std::env::var("VOICEPROMPT_INSPECT_PORT")
+                .unwrap_or_default()
+                .parse::<u16>()
+            {
+                if port >= 1024 {
+                    window.devtools = Some(true);
+                    window.additional_browser_args = Some(format!(
+                        "--remote-debugging-port={port} --remote-debugging-address=127.0.0.1"
+                    ));
+                }
+            }
+        }
+    }
     let mut builder = tauri::Builder::default()
         .manage(DesktopState {
             engine: Mutex::new(None),
@@ -612,7 +638,7 @@ pub fn run() {
             remember_island,
             quit_app
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("Cannot initialize VoicePrompt desktop");
     app.run(|app, event| {
         if let tauri::RunEvent::ExitRequested { api, .. } = event {

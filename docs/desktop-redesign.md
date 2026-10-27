@@ -64,6 +64,10 @@ tests. Unsigned artifacts remain unsigned; no publisher identity is generated.
 
 ## Development tools
 
+The dependency audit prompted a Python 3.11 build floor: patched filelock 4.2.4
+and Pillow 13 require it. Certifi was updated to 2026.10.23. The previous Python
+3.10 local environment is preserved; packaged users receive the new interpreter.
+
 The workstation has free Playwright MCP (Edge), shadcn MCP and Context7 MCP
 configured in Codex, with read-only initialization/tool checks in
 `scripts/check_ui_mcps.py`. These are development tools, not app dependencies.

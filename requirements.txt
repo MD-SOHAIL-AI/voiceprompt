@@ -8,7 +8,9 @@ numpy>=1.26.0
 pyperclip>=1.8.2
 pynput==1.8.2
 PySide6-Essentials==6.10.3
-Pillow>=10.0.0
+Pillow>=13.0.0
+certifi>=2026.10.19
+filelock>=4.2.1
 platformdirs>=4.2.0
 python-dotenv>=1.0.1
 google-genai>=1.0.0

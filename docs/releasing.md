@@ -2,7 +2,7 @@
 
 ## Validated target
 
-Windows x64, Python 3.10, Node 24, Rust stable/MSVC with a Windows SDK,
+Windows x64, Python 3.11, Node 24, Rust stable/MSVC with a Windows SDK,
 Microsoft WebView2 Runtime, PyInstaller 6.22.3 and Inno Setup 6.
 The source lock file records the tested environment, including optional RNNoise.
 Build on Windows; do not copy a Python virtual environment to users.

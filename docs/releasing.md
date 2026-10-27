@@ -83,7 +83,7 @@ publish a release.
 For a local build, create a draft release using the checked artifact and checksum:
 
 ```powershell
-gh release create v0.4.1-preview.1 release/VoicePrompt-Setup-0.4.1-x64.exe release/VoicePrompt-Setup-0.4.1-x64.exe.sha256 --repo MD-SOHAIL-AI/voiceprompt --draft --prerelease --title "VoicePrompt 0.4.1 preview" --notes-file docs/release-notes-0.4.1.md
+gh release create v0.5.1-preview.1 release/VoicePrompt-Setup-0.5.1-x64.exe release/VoicePrompt-Setup-0.5.1-x64.exe.sha256 --repo MD-SOHAIL-AI/voiceprompt --draft --prerelease --title "VoicePrompt 0.5.1 unsigned Windows preview" --notes-file docs/release-notes-0.5.1.md
 ```
 
 Users download from the repository's Releases page. The in-app update action opens

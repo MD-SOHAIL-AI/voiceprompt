@@ -8,7 +8,7 @@ Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete reco
 
 Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
-This branch contains the 0.5.1 desktop redesign. It is validated through pull-request artifacts before publication; a main-branch merge does not publish a release. Existing downloadable releases may use the previous interface. Models download separately on first preparation; cached models work offline. Unsigned builds are identified as unsigned.
+The 0.5.1 desktop redesign is available as an [unsigned Windows preview](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.5.1-preview.1). See the [release notes](docs/release-notes-0.5.1.md) for features, validation and remaining manual hardware checks. Models download separately on first preparation; cached models work offline. Main-branch pushes do not automatically publish releases.
 
 Uninstall from **Windows Settings → Apps → Installed apps → VoicePrompt**. The uninstaller closes the installed app and speech workers, removes installed files, shortcuts, and VoicePrompt startup entries, and keeps your settings, history, tasks, and shared model cache. A downloaded installer or a developer's source/build folders remain until you remove them yourself. The `Uninstall VoicePrompt Startup.bat` file only disables automatic startup; it does not uninstall the app.
 

@@ -1,5 +1,6 @@
 .env
 .venv/
+.venv311/
 venv/
 env/
 __pycache__/
@@ -13,8 +14,17 @@ build/
 dist/
 *.spec
 !packaging/VoicePrompt.spec
+!packaging/Engine.spec
 .tools/
 release/
 *.pfx
 *.p12
 evaluation/
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/*.tsbuildinfo
+.impeccable/build/
+.impeccable/review/
+.impeccable/mocks/

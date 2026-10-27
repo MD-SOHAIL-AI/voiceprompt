@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 
@@ -22,7 +22,7 @@ class PlannerStore:
             self._db.close()
             raise RuntimeError("This Planner database needs a newer version of VoicePrompt.")
         if existing_database and not path.with_suffix(".pre-desktop.sqlite3").exists():
-            with sqlite3.connect(path.with_suffix(".pre-desktop.sqlite3")) as backup:
+            with closing(sqlite3.connect(path.with_suffix(".pre-desktop.sqlite3"))) as backup:
                 self._db.backup(backup)
         self._db.execute("CREATE TABLE IF NOT EXISTS items (kind TEXT, id TEXT, data TEXT NOT NULL, PRIMARY KEY(kind,id))")
         self._db.execute("PRAGMA user_version=1")

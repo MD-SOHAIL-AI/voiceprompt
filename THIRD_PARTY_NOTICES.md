@@ -3,10 +3,14 @@
 VoicePrompt's application code uses the MIT license. This does not relicense its
 dependencies, native libraries, model weights, or bundled public warmup speech.
 
-- Qt / PySide6 / Shiboken: LGPLv3 / GPLv3 / commercial terms as applicable.
-  Only Qt Core, Gui, Widgets and their required runtime plugins are used.
-  Qt libraries remain separate DLLs in the installed application. License texts
-  and the installed distributions' notices accompany the binary release.
+- Tauri, React, Zustand, Radix UI and Lucide retain their MIT / Apache-2.0 / ISC
+  upstream terms. The desktop dependency lockfiles identify the exact versions.
+- Encode Sans by Impallari Type is bundled under the SIL Open Font License 1.1.
+  Its complete license is in desktop/src/assets/fonts/OFL.txt and licenses/ in
+  the packaged application. The font is loaded locally, without a font service.
+- Qt / PySide6 / Shiboken are used only by the explicit legacy source interface,
+  under LGPLv3 / GPLv3 / commercial terms as applicable. The new native package
+  excludes Qt. Legacy builds keep their Qt libraries as separate replaceable DLLs.
   Source: https://code.qt.io/pyside/pyside-setup.git and https://code.qt.io/qt/qtbase.git
   Qt licensing: https://doc.qt.io/qt-6/licensing.html
 - PyInstaller: GPL with its bootloader exception; see the bundled license.
@@ -30,7 +34,7 @@ dependencies, native libraries, model weights, or bundled public warmup speech.
   mono PCM; speech content unchanged. See voiceprompt/assets/README.md.
 
 Model files are downloaded from their providers and are not embedded in the
-application installer. The Downloads screen identifies the selected engine;
+application installer. The Dictation and Settings screens identify the selected engine;
 provider model cards above and the runtime's retained notices govern those files.
 
 You may replace the LGPL Qt DLLs with compatible builds and debug modifications

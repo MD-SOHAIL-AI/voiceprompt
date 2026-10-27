@@ -18,3 +18,14 @@ def save_key(provider, value):
         _backend().set_password("VoicePrompt.Cleanup", provider, value.strip())
     except Exception:
         raise RuntimeError("Windows credential storage is unavailable. Your key was not saved.") from None
+
+
+def remove_key(provider):
+    if provider not in {"openrouter", "gemini"}:
+        raise ValueError("Select a supported cleanup provider.")
+    try:
+        backend = _backend()
+        if backend.get_password("VoicePrompt.Cleanup", provider):
+            backend.delete_password("VoicePrompt.Cleanup", provider)
+    except Exception:
+        raise RuntimeError("Windows credential storage is unavailable. Your key was not removed.") from None

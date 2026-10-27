@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -43,6 +44,9 @@ class PushToTalkRecorder:
         self._capturing = False
         self._sample_count = 0
         self.level = 0.0
+        self._envelope = deque([0.0] * 32, maxlen=32)
+        self._envelope_level = 0.0
+        self._envelope_samples = 0
         self.input_overflows = 0
         self.callback_error = ""
         self.sample_rate = self.config.sample_rate
@@ -56,6 +60,11 @@ class PushToTalkRecorder:
     @property
     def is_recording(self) -> bool:
         return self._capturing
+
+    def envelope(self) -> list[float]:
+        """A bounded audio meter; reading it never consumes recognition frames."""
+        with self._lock:
+            return list(self._envelope) if self._capturing else [0.0] * 32
 
     @property
     def capture_failed(self) -> bool:
@@ -134,6 +143,9 @@ class PushToTalkRecorder:
             self._sample_count = 0
             self._started_at = time.perf_counter()
             self.input_overflows = 0
+            self._envelope.clear()
+            self._envelope.extend([0.0] * 32)
+            self._envelope_level = self._envelope_samples = 0
             self.callback_error = ""
             self._capturing = True
         try:
@@ -193,6 +205,16 @@ class PushToTalkRecorder:
                 return
             self._sample_count += len(chunk)
             self.level = min(1.0, float(np.max(np.abs(chunk))))
+            # Keep computation local and bounded. The bridge samples this buffer;
+            # no serialization or window operations run on PortAudio's callback.
+            self._envelope_samples += len(chunk)
+            if self._envelope_samples >= self.sample_rate / 30:
+                rms = float(np.sqrt(np.mean(np.square(chunk))))
+                target = min(1.0, max(0.0, (rms - 0.003) * 12.0))
+                smoothing = 0.72 if target > self._envelope_level else 0.22
+                self._envelope_level += smoothing * (target - self._envelope_level)
+                self._envelope.append(self._envelope_level)
+                self._envelope_samples = 0
             if self.config.retain_audio:
                 self._frames.append(chunk)
         if self.on_audio_chunk is not None:

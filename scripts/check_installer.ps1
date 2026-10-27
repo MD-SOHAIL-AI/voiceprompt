@@ -1,6 +1,10 @@
-param([string]$Installer = 'release\VoicePrompt-Setup-0.4.1-x64.exe')
+param([string]$Installer = '')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+if (-not $Installer) {
+    $version = [regex]::Match((Get-Content (Join-Path $projectRoot 'pyproject.toml') -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+    $Installer = 'release\VoicePrompt-Setup-' + $version + '-x64.exe'
+}
 $target = [IO.Path]::GetFullPath((Join-Path $projectRoot '.tools\installed check''s'))
 if (-not $target.StartsWith($projectRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Installer check target is outside the workspace'
@@ -28,7 +32,7 @@ $desktopLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'VoicePrompt.
 $menuLink = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\VoicePrompt\VoicePrompt.lnk'
 
 function Get-InstalledProcesses {
-    @(Get-CimInstance Win32_Process -Filter "Name = 'VoicePrompt.exe'" | Where-Object { $_.ExecutablePath -eq $installedExe })
+    @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and ($_.ExecutablePath -eq $installedExe -or $_.ExecutablePath -eq (Join-Path $target 'engine\VoicePromptEngine.exe')) })
 }
 
 function Start-LiveSmoke([string]$Executable, [string]$Label) {

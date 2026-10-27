@@ -1,6 +1,7 @@
 """Small Windows adapters; no UI toolkit or model imports."""
 import ctypes
 import sys
+import os
 
 
 def foreground_window():
@@ -9,6 +10,24 @@ def foreground_window():
     library = ctypes.windll.user32
     library.GetForegroundWindow.restype = ctypes.c_void_p
     return library.GetForegroundWindow() or 0
+
+
+def is_voiceprompt_window(handle):
+    if not handle:
+        return True
+    if sys.platform != "win32":
+        return False
+    from ctypes import wintypes
+    library = ctypes.windll.user32
+    library.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    library.GetWindowThreadProcessId.restype = wintypes.DWORD
+    process = wintypes.DWORD()
+    library.GetWindowThreadProcessId(handle, ctypes.byref(process))
+    try:
+        desktop = int(os.environ.get("VOICEPROMPT_DESKTOP_PID", "0"))
+    except ValueError:
+        desktop = 0
+    return process.value in {os.getpid(), desktop} or not process.value
 
 
 def modifiers_down():

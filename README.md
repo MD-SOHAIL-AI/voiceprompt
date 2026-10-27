@@ -8,7 +8,7 @@ Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete reco
 
 Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
-The 0.4.1 build is a preview. An unsigned preview is labelled in its release notes; signing support is included in the build script. Models download separately on first preparation. Setup shows progress and supports cancellation and retry; cached models work offline.
+This branch contains the 0.5.0 desktop redesign. It is validated through pull-request artifacts before publication; a main-branch merge does not publish a release. Existing downloadable releases may use the previous interface. Models download separately on first preparation; cached models work offline. Unsigned builds are identified as unsigned.
 
 Uninstall from **Windows Settings → Apps → Installed apps → VoicePrompt**. The uninstaller closes the installed app and speech workers, removes installed files, shortcuts, and VoicePrompt startup entries, and keeps your settings, history, tasks, and shared model cache. A downloaded installer or a developer's source/build folders remain until you remove them yourself. The `Uninstall VoicePrompt Startup.bat` file only disables automatic startup; it does not uninstall the app.
 
@@ -47,35 +47,44 @@ History contains transcript text on this device. Set its limit to zero to disabl
 
 ## Run from source
 
-Use 64-bit Python 3.10 on Windows for the validated build environment:
+Use 64-bit Python 3.11 on Windows for the build environment:
 
 ```powershell
-python -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements-lock.txt
-.\Start VoicePrompt.bat
+cd desktop
+npm ci
+npm run tauri -- dev
 ```
+
+Native development also requires Node 24, Rust stable, Microsoft C++ Build Tools with a Windows SDK, and the Microsoft WebView2 Runtime. `Start VoicePrompt.bat` opens a staged or installed native build. The previous Qt source interface is available with `python VoicePrompt.pyw --legacy-qt` for recovery. See [desktop development](desktop/README.md).
 
 The normal runtime dependencies are in `requirements.txt`. `requirements-noise.txt` enables optional RNNoise; keep it disabled unless it improves your recognition results. The lock file records the tested Windows build environment.
 
 ## Structure
 
-- **Presentation:** `desktop.py` uses PySide6/Qt Widgets; `ui.py` provides thread-safe controller adapters. Legacy Tk screens remain as reference source and regression tests, and are excluded from the packaged app.
+- **Presentation:** `desktop/src` contains React/TypeScript, shared state, forms and the floating island. `desktop/src-tauri` owns native windows, the tray, process containment and restricted external links. Qt/Tk presentation is excluded from the new package.
 - **Controller:** `main.py` owns session lifecycle, settings, insertion, and recovery. Shared states and stop reasons live in `state.py`.
 - **Audio and recognition:** `recorder.py`, `session.py`, and `backend_process.py` separate capture from potentially slow recognition. One persistent, isolated process owns the selected model.
-- **Services:** existing planner, contest, history, credentials, and storage modules retain their data formats.
-- **Release:** `packaging/` defines the bundle and installer; `scripts/build_windows.ps1` builds and validates them. CI prepares draft previews from version tags.
+- **Services:** `desktop_sidecar.py` adapts the existing controller, planner, contest, history, credentials and storage services through bounded JSON lines. Both native windows use one engine.
+- **Release:** `packaging/` defines the engine and per-user installer; `scripts/build_desktop.ps1` builds and validates them. CI uploads private workflow artifacts without publishing releases.
 
 ## Test and build
 
 ```powershell
 .\.venv\Scripts\python -m unittest discover -s tests -v
-.\.venv\Scripts\python scripts/preview_desktop.py
-.\scripts\build_windows.ps1
+.\.venv\Scripts\python scripts/check_engine_bridge.py
+cd desktop
+npm ci
+npm run test
+npm run build
+cd ..
+.\scripts\build_desktop.ps1
 ```
 
 The build script needs Inno Setup 6, either under `.tools\inno` or supplied with `-InnoCompiler`. Supply `-SignThumbprint` with your certificate identity and Windows SDK signtool to sign the application and installer. Outputs go to `release/`, including SHA-256 checksums. See [release instructions](docs/releasing.md) for publishing and clean-machine acceptance.
 
-The build self-check loads Qt and launches each speech worker without accessing personal settings, microphone, hooks, or model downloads. It verifies packaging, rather than speech accuracy.
+The build self-check launches the Tauri executable and all four frozen speech workers without personal settings, microphone, hooks or model downloads. Separate WebView2 integration checks exercise the actual packaged engine using a disposable profile. These checks verify packaging and workflows; speech accuracy and physical microphone/global-key behavior require manual acceptance.
 
 For a five-minute offline endurance replay of bundled licensed public speech:
 

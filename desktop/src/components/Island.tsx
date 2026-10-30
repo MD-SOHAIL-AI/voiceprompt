@@ -244,6 +244,26 @@ export function Island() {
   if (!runtime || !visible) return null;
   const timer = hub?.timer,
     active = timer && ["running", "paused"].includes(timer.status);
+  const timerProgress = timer
+    ? Math.max(
+        0,
+        Math.min(
+          1,
+          1 -
+            timer.remaining /
+              Math.max(
+                1,
+                timer[
+                  timer.phase === "short_break"
+                    ? "short_break"
+                    : timer.phase === "long_break"
+                      ? "long_break"
+                      : "work"
+                ],
+              ),
+        ),
+      )
+    : 0;
   const fullLabel =
     kind === "focus" && timer
       ? `${timer.title}, ${countdown(timer.remaining)} remaining, ${timer.status}`
@@ -309,32 +329,30 @@ export function Island() {
             <>
               <span
                 className={`mini-progress ${timer.status}`}
-                style={
-                  {
-                    "--progress":
-                      Math.max(
-                        0,
-                        Math.min(
-                          1,
-                          1 -
-                            timer.remaining /
-                              Math.max(
-                                1,
-                                timer[
-                                  timer.phase === "short_break"
-                                    ? "short_break"
-                                    : timer.phase === "long_break"
-                                      ? "long_break"
-                                      : "work"
-                                ],
-                              ),
-                        ),
-                      ) *
-                        100 +
-                      "%",
-                  } as React.CSSProperties
-                }
+                aria-hidden="true"
               >
+                <svg
+                  key={`${timer.id}:${timer.phase_index}`}
+                  className="mini-progress-ring"
+                  viewBox="0 0 20 20"
+                >
+                  <circle
+                    className="mini-progress-track"
+                    cx="10"
+                    cy="10"
+                    r="7.5"
+                  />
+                  <circle
+                    className="mini-progress-value"
+                    cx="10"
+                    cy="10"
+                    r="7.5"
+                    pathLength="100"
+                    strokeDasharray="100"
+                    strokeDashoffset={100 * (1 - timerProgress)}
+                    opacity={timerProgress > 0 ? 1 : 0}
+                  />
+                </svg>
                 {timer.status === "paused" && <Pause size={8} />}
               </span>
               <span className="numeric">{countdown(timer.remaining)}</span>

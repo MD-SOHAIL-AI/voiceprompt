@@ -263,6 +263,34 @@ async function expand(tab) {
     await island
       .getByRole("button", { name: "Collapse island", exact: true })
       .click();
+    const ring = island.locator(".mini-progress-value");
+    await expect(ring).toBeVisible();
+    await shot(island, "island-compact-timer");
+    await main.getByRole("button", { name: "Pause", exact: true }).click();
+    await expect(island.locator(".mini-progress")).toHaveClass(/paused/);
+    await wait(200);
+    const paused = await ring.evaluate(
+      (node) => getComputedStyle(node).strokeDashoffset,
+    );
+    await wait(600);
+    assert.equal(
+      await ring.evaluate((node) => getComputedStyle(node).strokeDashoffset),
+      paused,
+    );
+    await shot(island, "island-compact-paused");
+    await island.emulateMedia({ reducedMotion: "reduce" });
+    assert(
+      await ring.evaluate((node) =>
+        getComputedStyle(node)
+          .transitionDuration.split(",")
+          .every((duration) => parseFloat(duration) < 0.01),
+      ),
+    );
+    await island.emulateMedia({ reducedMotion: null });
+    await main.getByRole("button", { name: "Resume", exact: true }).click();
+    report.checks.push(
+      "Compact timer renders, holds its ring while paused, and respects reduced motion",
+    );
   } else {
     await main.getByRole("button", { name: "Pause", exact: true }).click();
     await main.getByRole("button", { name: "Resume", exact: true }).click();
@@ -385,7 +413,7 @@ async function expand(tab) {
         },
         { timeout: 30000 },
       )
-      .toBe(1);
+      .toBe(2);
     await expect(main.locator(".notice.danger")).toHaveCount(0);
     const restarted = await rpc("planner.snapshot");
     assert(

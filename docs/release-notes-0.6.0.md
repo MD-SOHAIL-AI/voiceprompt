@@ -17,6 +17,9 @@ candidate; stable publication still requires the production acceptance record.
   snapshots preserve supported formats, and sequence checks respect subsequent
   user changes. Unsupported or oversized clipboard formats fall back to Copy.
 - Added original soft start/release clicks and idle-only preview buttons.
+- Smoothed the floating timer ring, softened the compact border, and added brief
+  panel transitions without changing its native footprint. Reduced-motion
+  preferences and steady countdown spacing are preserved.
 - Bounded planner and history messages by encoded size; full notes/transcripts
   load separately. Alarm pages share stable ordering. Oversized events no longer
   quit the speech engine.

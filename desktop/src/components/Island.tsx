@@ -332,7 +332,7 @@ export function Island() {
                 aria-hidden="true"
               >
                 <svg
-                  key={`${timer.id}:${timer.phase_index}`}
+                  key={`${timer.session}:${timer.phase_index}`}
                   className="mini-progress-ring"
                   viewBox="0 0 20 20"
                 >

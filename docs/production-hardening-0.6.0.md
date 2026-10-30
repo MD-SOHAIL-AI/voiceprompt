@@ -25,12 +25,16 @@ must not be presented as a signed or production-approved release.
 | R15 | P1 | Recording sounds were unsuitable; original rounded start/release clicks replace the tones. | WAV validation; subjective hardware listening pending |
 | R16 | P0 | Audio-thread initialization failure left work busy; supervise submitted futures and keep shutdown cleanup independent. | Application regression |
 | R17 | P0 | Frame-drop failure could leave readiness true after worker interruption; invalidate readiness and reopen capture. | Application regression |
+| R18 | P2 | Generated Rust HTML entered frontend scanning and stalled preview checks; restrict frontend entries and exclude Rust output from watching. | Browser interaction and accessibility checks |
 
 Current source verification: 192 Python tests completed successfully (two optional
 checks skipped), 13 frontend tests passed, the production frontend built, five
 Rust tests passed, and Clippy passed with warnings denied. The source bridge
 checks include preserved-data restart and explicit settings recovery. Frozen
 package and native WebView verification are recorded separately after building.
+The explicit browser preview passed all seven screens, twelve theme variants,
+shared appearance controls, and serious/critical accessibility checks after the
+floating timer polish. It does not substitute for native or hardware acceptance.
 
 ## Reproducing verification
 

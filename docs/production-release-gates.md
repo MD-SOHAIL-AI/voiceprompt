@@ -36,7 +36,7 @@ a CI Windows runner. It **does not** establish safe operation on user hardware.
 - [ ] The final SHA-256 checksum is independently verified on the exact published
       EXE bytes and GitHub release assets are checked after upload.
 - [ ] Release notes accurately explain Windows support, voice-data privacy,
-      cloud cleanup opt-in, signing status, and manual-update instructions.
+      local-only AI processing, signing status, and manual-update instructions.
 
 Record test device/OS build, result, reproduction evidence, reviewer, date and
 artifact SHA-256 in a release-specific acceptance record. Do not place customer

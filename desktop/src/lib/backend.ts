@@ -58,7 +58,7 @@ export async function native(
 export async function openLink(url: string) {
   if (isNative()) await invoke("open_link", { url });
   else if (isPreview())
-    notify("Preview: the desktop app opens this contest in your browser.");
+    notify("Preview: the desktop app opens this link in your browser.");
 }
 export function navigate(page: Page) {
   useApp.getState().setPage(page);

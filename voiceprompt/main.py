@@ -64,6 +64,7 @@ class VoicePromptApp:
         self._working = False
         self._ready = False
         self._quitting = False
+        self._updating = False
         self.shutdown_requested = lambda: False
         self._current_id = 0
         self._work_started_at = 0.0
@@ -156,6 +157,21 @@ class VoicePromptApp:
             self._close_resources()
         self._executor.shutdown(wait=False)
 
+    def prepare_update(self) -> None:
+        """Quiesce under the hotkey lock without discarding retained audio."""
+        with self._control:
+            if self._quitting or self._working or self._session is not None or self.recorder.is_recording:
+                raise ValueError("Finish recording, recognition and model preparation before restarting to update.")
+            if self._failed_audio is not None:
+                raise ValueError("Recover or discard your retained recording before restarting to update.")
+            if self.insertion_status == "pending" or self._pending_settings is not None:
+                raise ValueError("Wait for your text and saved settings before restarting to update.")
+            self._updating = True
+
+    def cancel_update(self) -> None:
+        with self._control:
+            self._updating = False
+
     def _close_resources(self) -> None:
         try:
             callbacks = [self.recorder.close, self.transcriber.close, self.injector.cancel_restore, self.diagnostics.close]
@@ -223,7 +239,7 @@ class VoicePromptApp:
 
     def preload_model(self) -> None:
         with self._control:
-            if self._working or self._quitting:
+            if self._working or self._quitting or self._updating:
                 return
             sid = self._begin_work()
             self.last_error = ""
@@ -268,7 +284,7 @@ class VoicePromptApp:
 
     def start_recording(self) -> None:
         with self._control:
-            if self._working or self._quitting:
+            if self._working or self._quitting or self._updating:
                 return
             if not self._ready:
                 # A cold model must become ready before accepting speech.
@@ -469,7 +485,7 @@ class VoicePromptApp:
 
     def retry_failed(self):
         with self._control:
-            if self._working or self._quitting or not self._failed_audio:
+            if self._working or self._quitting or self._updating or not self._failed_audio:
                 return
             sid = self._begin_work()
             chunks = self._failed_audio
@@ -538,7 +554,7 @@ class VoicePromptApp:
 
     def check_microphone(self):
         with self._control:
-            if self._working or self._quitting:
+            if self._working or self._quitting or self._updating:
                 return
             sid = self._begin_work()
             self._preparation_cancelled = False
@@ -567,7 +583,7 @@ class VoicePromptApp:
 
     def retry_last(self) -> None:
         with self._control:
-            if self._working or self._quitting:
+            if self._working or self._quitting or self._updating:
                 return
             sid = self._begin_work()
             self._submit_work(sid, self._retry_worker, sid)

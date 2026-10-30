@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useUnsavedChanges } from "../lib/updates";
 import {
   Check,
   Edit3,
@@ -86,6 +87,7 @@ export function TasksPage() {
   const [quick, setQuick] = useState(""),
     [editing, setEditing] = useState<Task | "new" | null>(null),
     [removing, setRemoving] = useState<Task | null>(null);
+  useUnsavedChanges(Boolean(quick.trim()), "task entry");
   const paged = usePaged<Task>(
     "task",
     planner?.tasks ?? [],
@@ -390,6 +392,16 @@ export function TimerComposer({ compact = false }: { compact?: boolean }) {
     [replacement, setReplacement] = useState<Record<string, unknown> | null>(
       null,
     );
+  const timerDraft = JSON.stringify({
+    title,
+    minutes,
+    mode,
+    shortBreak,
+    longBreak,
+    rounds,
+  });
+  const [savedTimerDraft, setSavedTimerDraft] = useState(timerDraft);
+  useUnsavedChanges(timerDraft !== savedTimerDraft, "focus timer changes");
   useEffect(() => {
     if (focusTask) setTitle(focusTask.title);
   }, [focusTask]);
@@ -411,6 +423,7 @@ export function TimerComposer({ compact = false }: { compact?: boolean }) {
     }
     if (await action.run("planner.timer.start", params)) {
       notify("Focus session started.");
+      setSavedTimerDraft(timerDraft);
       useApp.setState({ focusTask: null });
     }
   }

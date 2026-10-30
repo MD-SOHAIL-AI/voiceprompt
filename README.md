@@ -20,6 +20,18 @@ Uninstall from **Windows Settings → Apps → Installed apps → VoicePrompt**.
 
 If you used the 0.4.0 uninstaller while VoicePrompt was running and files remain, install 0.4.1 into the same folder, then uninstall again. This repairs the installation record so the fixed uninstaller can remove those files.
 
+## App updates
+
+Version 0.6.1 adds **Check for updates** in Settings and an **Update now** action
+when a stable release is available. Downloads are verified before installation;
+choose **Restart to update** when ready. Existing users install the first
+updater-enabled version manually once. Saved data and cached models are preserved.
+Automatic checks can be disabled. Update signatures and GitHub release hosting
+require no paid service; Windows publisher signing remains separate.
+
+Maintainers publish updates by pushing a matching version tag after merging to
+main. See [update setup and release instructions](docs/app-updates.md).
+
 ## Voice typing
 
 In **Settings → Appearance**, choose Light, Dark, or System brightness and a
@@ -62,6 +74,10 @@ Audio and transcript processing remain local. Gemini and OpenRouter integrations
 
 History contains transcript text on this device. Set its limit to zero to disable future persistence, or use **Clear history**. Diagnostic metrics contain timestamps, duration, backlog, stop reason, engine, and outcome, without transcript text or audio. No telemetry is uploaded automatically.
 
+Automatic app update checks contact GitHub for release metadata and can be disabled
+in Settings. Installers download only when you choose Update now. Audio,
+transcripts, and diagnostic logs are not included in update requests.
+
 ## Run from source
 
 Use 64-bit Python 3.11 on Windows for the build environment:
@@ -84,7 +100,7 @@ The normal runtime dependencies are in `requirements.txt`. `requirements-noise.t
 - **Controller:** `main.py` owns session lifecycle, settings, insertion, and recovery. Shared states and stop reasons live in `state.py`.
 - **Audio and recognition:** `recorder.py`, `session.py`, and `backend_process.py` separate capture from potentially slow recognition. One persistent, isolated process owns the selected model.
 - **Services:** `desktop_sidecar.py` adapts the existing controller, planner, contest, history, credentials and storage services through bounded JSON lines. Both native windows use one engine.
-- **Release:** `packaging/` defines the engine and per-user installer; `scripts/build_desktop.ps1` builds and validates them. CI uploads private workflow artifacts without publishing releases.
+- **Release:** `packaging/` defines the engine and per-user installer. Routine CI tests without publishing; stable version tags use `scripts/build_update_release.py` to build and verify update-signed releases.
 
 ## Test and build
 

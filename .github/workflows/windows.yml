@@ -64,6 +64,7 @@ jobs:
         if: always()
         with:
           name: VoicePrompt-ui-checks
+          retention-days: 1
           path: |
             .impeccable/review/*.png
             build/ui-checks.json
@@ -113,10 +114,8 @@ jobs:
         if: always()
         with:
           name: VoicePrompt-windows-x64-unsigned-preview
-          retention-days: 14
+          retention-days: 1
           path: |
-            release/*
-            dist/VoicePrompt/**
             build/frozen-smoke.json
             build/frozen-bridge.json
             build/installer-check.json

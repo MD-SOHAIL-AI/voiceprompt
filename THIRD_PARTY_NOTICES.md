@@ -33,6 +33,11 @@ dependencies, native libraries, model weights, or bundled public warmup speech.
   Indian English, sample 40631389_215_58_229_71, CC BY 4.0. Converted to 16 kHz
   mono PCM; speech content unchanged. See voiceprompt/assets/README.md.
 
+- Minisign-verify 0.3.0, Frank Denis and its cryptographic contributors: MIT and
+  the retained upstream notices. Unmodified source is pinned under
+  `desktop/src-tauri/vendor/minisign-verify`; update releases include its license
+  and source revision under `licenses/minisign-verify`.
+
 Model files are downloaded from their providers and are not embedded in the
 application installer. The Dictation and Settings screens identify the selected engine;
 provider model cards above and the runtime's retained notices govern those files.

@@ -1,5 +1,10 @@
 # Build and release VoicePrompt
 
+For the free in-app update channel, use the explicit update-signed release driver
+and version-tag workflow in [app updates](app-updates.md). It verifies releases
+using the app's public key without claiming a Windows publisher identity. The
+publisher-signed build path below retains its existing certificate requirement.
+
 ## Validated target
 
 Windows x64, Python 3.11, Node 24, Rust stable/MSVC with a Windows SDK,
@@ -92,6 +97,8 @@ For a local build, create a draft release using the checked artifact and checksu
 gh release create v0.6.0-preview.1 release/VoicePrompt-Setup-0.6.0-x64-unsigned-preview.exe release/VoicePrompt-Setup-0.6.0-x64-unsigned-preview.exe.sha256 release/VoicePrompt-Setup-0.6.0-x64-unsigned-preview.exe.signing.json --repo MD-SOHAIL-AI/voiceprompt --draft --prerelease --title "VoicePrompt 0.6.0 unsigned Windows preview" --notes-file docs/release-notes-0.6.0.md
 ```
 
-Users download from the repository's Releases page. The in-app update action opens
-the full release list so both published previews and stable builds are discoverable.
-An update uses the same installer and leaves user data in place.
+Users download the first updater-enabled version from Releases. Subsequent stable
+releases support in-app detection, verified download and an explicit restart.
+View all releases still opens the full list, including previews. Updates use the
+same per-user installer and preserve user data. See [app updates](app-updates.md)
+for version-tag publication; routine main/PR builds do not publish.

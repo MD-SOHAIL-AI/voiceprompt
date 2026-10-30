@@ -2,11 +2,14 @@
   #define AppVersion "0.5.2"
 #endif
 #define RepoRoot AddBackslash(SourcePath) + ".."
-#if !defined(SignedRelease) && !defined(UnsignedPreview)
-  #error Specify SignedRelease or UnsignedPreview through scripts/build_desktop.ps1.
+#if !defined(SignedRelease) && !defined(UnsignedPreview) && !defined(UpdateSignedRelease)
+  #error Specify SignedRelease, UnsignedPreview or UpdateSignedRelease through the release build scripts.
 #endif
 #if defined(SignedRelease) && defined(UnsignedPreview)
   #error SignedRelease and UnsignedPreview are mutually exclusive.
+#endif
+#if defined(UpdateSignedRelease) && (defined(SignedRelease) || defined(UnsignedPreview))
+  #error Select exactly one release signing mode.
 #endif
 
 [Setup]
@@ -31,9 +34,11 @@ OutputDir={#RepoRoot}\release
 OutputBaseFilename=VoicePrompt-Setup-{#AppVersion}-x64-unsigned-preview
 #else
 OutputBaseFilename=VoicePrompt-Setup-{#AppVersion}-x64
+#ifdef SignedRelease
 SignTool=voiceprompt
 SignedUninstaller=yes
 SignedUninstallerDir={#SignedUninstallerPath}
+#endif
 #endif
 SetupIconFile={#RepoRoot}\build\VoicePrompt.ico
 UninstallDisplayIcon={app}\VoicePrompt.exe
@@ -69,6 +74,10 @@ Filename: "{app}\VoicePrompt.exe"; Description: "Open VoicePrompt"; Flags: nowai
 const
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
 
+var
+  UpdateStartup: Boolean;
+  PreviousFiles: TStringList;
+
 function OpenEvent(Access: LongWord; InheritHandle: Boolean; Name: String): THandle;
   external 'OpenEventW@kernel32.dll stdcall';
 function SetEvent(Event: THandle): Boolean;
@@ -77,6 +86,23 @@ function CloseHandle(Handle: THandle): Boolean;
   external 'CloseHandle@kernel32.dll stdcall';
 function GetBundleAttributes(Path: String): LongWord;
   external 'GetFileAttributesW@kernel32.dll stdcall';
+
+function SafeBundleFile(Path: String): Boolean;
+var
+  Parent: String;
+begin
+  Result := (Path <> '') and (Pos('..', Path) = 0) and (Pos(':', Path) = 0) and
+    (Copy(Path, 1, 1) <> '\') and (Copy(Path, 1, 1) <> '/');
+  if not Result then Exit;
+  Parent := ExtractFileDir(ExpandConstant('{app}\') + Path);
+  while Length(Parent) >= Length(ExpandConstant('{app}')) do begin
+    if (GetBundleAttributes(Parent) and $400) <> 0 then begin
+      Result := False;
+      Exit;
+    end;
+    Parent := ExtractFileDir(Parent);
+  end;
+end;
 
 function InstalledProcesses(Wmi: Variant): Variant;
 var
@@ -242,4 +268,41 @@ begin
   end;
   { Only installed files are removed. Source code, saved data and shared model
     caches are preserved; do not recursively delete the app folder or a profile. }
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Value, Inventory, Relative: String;
+  CurrentFiles: TStringList;
+  I: Integer;
+begin
+  Inventory := ExpandConstant('{app}\installed-files.txt');
+  if CurStep = ssInstall then begin
+    UpdateStartup := RegQueryStringValue(HKCU, RunKey, 'VoicePrompt', Value) and
+      (Pos(Lowercase(ExpandConstant('{app}\VoicePrompt.exe')), Lowercase(Value)) > 0);
+    PreviousFiles := TStringList.Create;
+    if FileExists(Inventory) then PreviousFiles.LoadFromFile(Inventory);
+  end;
+  if CurStep = ssPostInstall then begin
+    if ExpandConstant('{param:VOICEPROMPTUPDATE|0}') = '1' then begin
+      if UpdateStartup then
+        RegWriteStringValue(HKCU, RunKey, 'VoicePrompt', '"' + ExpandConstant('{app}\VoicePrompt.exe') + '"')
+      else RemoveStartupEntry('VoicePrompt');
+    end;
+    if FileExists(Inventory) and Assigned(PreviousFiles) then begin
+      CurrentFiles := TStringList.Create;
+      try
+        CurrentFiles.LoadFromFile(Inventory);
+        for I := 0 to PreviousFiles.Count - 1 do begin
+          Relative := PreviousFiles[I];
+          if (CurrentFiles.IndexOf(Relative) < 0) and SafeBundleFile(Relative) then
+            if not DeleteFile(ExpandConstant('{app}\') + Relative) then
+              Log('Obsolete package file could not be removed: ' + Relative);
+        end;
+      finally
+        CurrentFiles.Free;
+      end;
+    end;
+    if Assigned(PreviousFiles) then PreviousFiles.Free;
+  end;
 end;

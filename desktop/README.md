@@ -56,5 +56,6 @@ Raw microphone audio remains in the local speech engine. The waveform receives
 only a bounded 32-value amplitude envelope. AI processing stays on the device. Legacy cloud credentials are retired on upgrade. Model downloads and optional contest requests remain online; CLIST uses Windows Credential Manager.
 
 The app uses local fonts and code-rendered controls/waveforms. It contains no
-remote scripts, analytics or automatic release publishing. See the root README,
+remote scripts or analytics. Stable version tags publish verified app updates;
+routine main pushes do not. See `docs/app-updates.md`, the root README,
 `docs/desktop-redesign.md` and `docs/releasing.md` for acceptance limits.

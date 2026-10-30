@@ -22,10 +22,13 @@ import { TasksPage, FocusPage, AlarmsPage } from "./pages/Planner";
 import { ContestsPage } from "./pages/Contests";
 import { SettingsPage } from "./pages/Settings";
 import { NotificationList } from "./components/Notifications";
+import { UpdateShortcut } from "./components/Updates";
+import { useUpdateConnection } from "./lib/updates";
 
 const icons = [Mic, History, ListTodo, Timer, AlarmClock, Trophy, SettingsIcon];
 export default function App() {
   useBackend();
+  useUpdateConnection();
   const page = useApp((s) => s.page),
     setPage = useApp((s) => s.setPage),
     data = useApp((s) => s.data);
@@ -85,6 +88,7 @@ export default function App() {
       </aside>
       <div className="titlebar" data-tauri-drag-region>
         <div data-tauri-drag-region />
+        <UpdateShortcut />
         <Button
           tone="ghost"
           aria-label={`Pending reminders${count ? `: ${count}` : ""}`}

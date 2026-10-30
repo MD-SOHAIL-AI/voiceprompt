@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { ExternalLink, Save } from "lucide-react";
-import { openLink } from "../lib/backend";
+import { Save } from "lucide-react";
 import { notify, useApp } from "../store";
 import type { Settings } from "../types";
 import { Button, Field, Toggle, useAction } from "../components/ui";
 import { AppearanceSettings } from "../components/AppearanceSettings";
 import { version as appVersion } from "../../package.json";
+import { Updates } from "../components/Updates";
+import { useUnsavedChanges } from "../lib/updates";
 
 export function SettingsPage() {
   const saved = useApp((s) => s.settings)!,
@@ -20,6 +21,15 @@ export function SettingsPage() {
         .join("\n"),
     ),
     [zone, setZone] = useState(planner?.preferences.timezone ?? "Asia/Kolkata");
+  useUnsavedChanges(
+    JSON.stringify(form) !== JSON.stringify(baseline.current) ||
+      dictionary !==
+        Object.entries(baseline.current.replacements)
+          .map(([from, to]) => `${from}=${to}`)
+          .join("\n") ||
+      zone !== (planner?.preferences.timezone ?? "Asia/Kolkata"),
+    "settings changes",
+  );
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) =>
     setForm((previous) => ({ ...previous, [key]: value }));
   const select = <K extends keyof Settings>(
@@ -66,6 +76,7 @@ export function SettingsPage() {
     );
     if (await action.run("settings.save", { settings: patch })) {
       baseline.current = structuredClone(draft);
+      setForm(structuredClone(draft));
       notify(
         "Settings queued. They apply after any current recording finishes.",
       );
@@ -322,16 +333,6 @@ export function SettingsPage() {
           </p>
           <div className="button-row">
             <Button
-              onClick={() =>
-                void openLink(
-                  "https://github.com/MD-SOHAIL-AI/voiceprompt/releases",
-                ).catch((error) => notify(String(error)))
-              }
-            >
-              <ExternalLink size={15} />
-              Check for updates
-            </Button>
-            <Button
               onClick={() => {
                 useApp.setState({ page: "Dictation" });
                 void action.run("settings.save", {
@@ -343,6 +344,7 @@ export function SettingsPage() {
             </Button>
           </div>
         </section>
+        <Updates />
       </fieldset>
       <div className="settings-save-footer">
         <Button

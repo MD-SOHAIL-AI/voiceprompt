@@ -122,6 +122,14 @@ class DesktopService:
 
     def dispatch(self, method, params):
         app = self.app
+        if method == "update.prepare":
+            app.prepare_update()
+            return {"ok": True}
+        if method == "update.cancel":
+            app.cancel_update()
+            return {"ok": True}
+        if getattr(app, "_updating", False) and method not in {"runtime", "shutdown", "bootstrap"}:
+            raise ValueError("VoicePrompt is closing to install an update.")
         if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") and method in {"prepare", "microphone.check", "record.start", "record.retry"}:
             raise ValueError("Microphone capture and speech preparation are disabled in an isolated verification profile.")
         if method == "bootstrap":

@@ -13,6 +13,10 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_opener::OpenerExt;
 
+mod update_core;
+mod update_http;
+mod updates;
+
 const MAX_FRAME: usize = 1024 * 1024;
 const ENGINE_STOPPED: &str = "The voice engine stopped. Restart it to continue.";
 static ENGINE_GENERATION: AtomicU64 = AtomicU64::new(1);
@@ -362,7 +366,7 @@ async fn engine_request(
     params: Value,
     state: State<'_, DesktopState>,
 ) -> Result<Value, String> {
-    if method == "shutdown" {
+    if method == "shutdown" || method.starts_with("update.") {
         return Err("Use the app's Quit action.".into());
     }
     let engine = engine(&state)?;
@@ -380,6 +384,13 @@ async fn engine_request(
 #[tauri::command]
 async fn restart_engine(app: AppHandle, state: State<'_, DesktopState>) -> Result<(), String> {
     let _restart = state.restart_lock.lock().await;
+    if app
+        .state::<updates::Updates>()
+        .installing
+        .load(Ordering::Acquire)
+    {
+        return Err("VoicePrompt is closing to install an update.".into());
+    }
     if state.quitting.load(Ordering::Acquire) {
         return Err("The app is closing.".into());
     }
@@ -678,6 +689,9 @@ fn quit_app(app: AppHandle) {
 }
 
 pub fn run() {
+    if updates::helper_mode() {
+        return;
+    }
     let smoke = std::env::args().any(|arg| arg == "--smoke-test");
     let mut context = tauri::generate_context!();
     let acceptance = std::env::var_os("VOICEPROMPT_ACCEPTANCE_DIR")
@@ -708,6 +722,7 @@ pub fn run() {
         }
     }
     let mut builder = tauri::Builder::default()
+        .manage(updates::Updates::new())
         .manage(DesktopState {
             restart_lock: tauri::async_runtime::Mutex::new(()),
             engine: Mutex::new(None),
@@ -724,6 +739,9 @@ pub fn run() {
     }
     let app = builder
         .setup(move |app| {
+            if !smoke {
+                updates::schedule(app.handle().clone());
+            }
             if smoke {
                 if let Some(main) = app.get_webview_window("main") {
                     let _ = main.hide();
@@ -814,7 +832,13 @@ pub fn run() {
             island_status,
             restore_island,
             remember_island,
-            quit_app
+            quit_app,
+            updates::update_status,
+            updates::update_check,
+            updates::update_download,
+            updates::update_cancel,
+            updates::update_preferences,
+            updates::update_install
         ])
         .build(context)
         .expect("Cannot initialize VoicePrompt desktop");

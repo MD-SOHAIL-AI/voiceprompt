@@ -223,6 +223,25 @@ small {
 .titlebar .button:hover {
   background: var(--selected);
 }
+.titlebar .button.update-shortcut {
+  width: auto;
+  padding: 0 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.app-updates .update-progress {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-variant-numeric: tabular-nums;
+}
+.app-updates progress {
+  width: 100%;
+}
+.update-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .titlebar .close-window:hover {
   background: #9e3b3b;
   color: white;

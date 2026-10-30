@@ -1,0 +1,110 @@
+name: Publish stable Windows update
+
+on:
+  push:
+    tags: ['v[0-9]*.[0-9]*.[0-9]*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voiceprompt-stable-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'MD-SOHAIL-AI/voiceprompt'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Validate stable tag and main ancestry
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path pyproject.toml -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_NAME -cne "v$version" -or $version -notmatch '^\d+\.\d+\.\d+$') { throw 'Tag must exactly match the stable application version.' }
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Release tag must point to a commit on main.' }
+          gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --json isDraft
+          if ($LASTEXITCODE -eq 0) { throw 'Release already exists. Use a new version; never replace release assets.' }
+          exit 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Install pinned dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-lock.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Python dependency installation failed.' }
+          npm --prefix desktop ci
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
+      - name: Python and frontend regressions
+        shell: pwsh
+        env:
+          VOICEPROMPT_TEST_LEGACY_TK: '0'
+        run: |
+          python scripts/verify_versions.py
+          if ($LASTEXITCODE -ne 0) { throw 'Version verification failed.' }
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Python regressions failed.' }
+          python scripts/check_engine_bridge.py
+          if ($LASTEXITCODE -ne 0) { throw 'Engine bridge verification failed.' }
+          npm --prefix desktop run test
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend regressions failed.' }
+          npm --prefix desktop run build
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+      - name: Rust trust and handoff regressions
+        shell: pwsh
+        run: |
+          cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --lib
+          if ($LASTEXITCODE -ne 0) { throw 'Rust regressions failed.' }
+          cargo clippy --manifest-path desktop/src-tauri/Cargo.toml --locked -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Rust review failed.' }
+      - name: Update UI flow and accessibility
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { throw 'Browser installation failed.' }
+          node scripts/verify-updates.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Update UI verification failed.' }
+      - name: Build and sign the complete update
+        shell: pwsh
+        env:
+          VOICEPROMPT_UPDATE_PRIVATE_KEY: ${{ secrets.VOICEPROMPT_UPDATE_PRIVATE_KEY }}
+          VOICEPROMPT_UPDATE_KEY_PASSWORD: ${{ secrets.VOICEPROMPT_UPDATE_KEY_PASSWORD }}
+        run: |
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          python scripts/build_update_release.py --notes "docs/release-notes-$version.md"
+          if ($LASTEXITCODE -ne 0) { throw 'Update release build failed.' }
+      - name: Verify packaged engine, native UI, and installer
+        shell: pwsh
+        run: |
+          python scripts/check_engine_bridge.py --engine dist/VoicePrompt/engine/VoicePromptEngine.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged engine verification failed.' }
+          ./scripts/check_native.ps1 -Python python
+          ./scripts/check_installer.ps1 -Installer "release/VoicePrompt-Setup-$($env:GITHUB_REF_NAME.Substring(1))-x64.exe" -AllowUnsignedPreview
+          python scripts/release_updates.py verify --metadata release/latest.json --installer "release/VoicePrompt-Setup-$($env:GITHUB_REF_NAME.Substring(1))-x64.exe" --native-exe dist/VoicePrompt/VoicePrompt.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Final update verification failed.' }
+      - name: Publish complete release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $installer = "release/VoicePrompt-Setup-$version-x64.exe"
+          gh release create $env:GITHUB_REF_NAME $installer "$installer.sha256" "$installer.signing.json" "$installer.update-signing.json" release/latest.json --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title "VoicePrompt $version" --notes-file "docs/release-notes-$version.md"
+          if ($LASTEXITCODE -ne 0) { throw 'Draft upload failed. Nothing was published.' }
+          gh release edit $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed; inspect the draft.' }

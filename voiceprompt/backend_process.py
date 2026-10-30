@@ -10,6 +10,8 @@ import threading
 import time
 from pathlib import Path
 
+import numpy as np
+
 from voiceprompt.config import config_dir
 
 
@@ -48,6 +50,8 @@ def run_worker(handle: int):
                 elif command == "options":
                     backend.update_options(*argument)
                     value = None
+                elif command == "transcribe_batch" and backend.backend_name == "whisper":
+                    value = backend.transcribe(argument)
                 else:
                     method = getattr(backend, command)
                     value = method() if argument is None else method(argument)
@@ -67,14 +71,23 @@ class ManagedTranscriber:
     def __init__(self, settings):
         self.settings = copy.deepcopy(settings)
         self.backend_name = settings.backend
-        self.streaming = settings.backend != "whisper"
+        self.streaming = settings.backend != "whisper" or settings.whisper_phrase_decoding
         self.loaded_model = ""
         self.fallback_reason = ""
         self.progress = None
         self._process = self._connection = None
         self._lock = threading.RLock()
+        self._pending = np.empty(0, dtype=np.float32)
+        self._active = False
+        self._deadline = None
+        self._lifecycle = threading.RLock()
 
     def _start(self):
+        with self._lifecycle:
+            self._start_locked()
+
+    def _start_locked(self):
+        self._deadline = None
         if self._process is not None and self._process.poll() is None:
             return
         self.interrupt()
@@ -115,41 +128,87 @@ class ManagedTranscriber:
             try:
                 connection.send((command, argument))
                 deadline = time.monotonic() + timeout
+                if self._deadline is not None and command not in {"preload", "abort_session", "options"}:
+                    deadline = min(deadline, self._deadline)
                 while time.monotonic() < deadline:
                     if not connection.poll(min(0.05, max(0, deadline - time.monotonic()))):
                         continue
                     reply = connection.recv()
+                    if connection is not self._connection:
+                        raise RuntimeError("This speech operation was cancelled.")
                     if reply[0] == "progress":
                         if self.progress:
                             self.progress(reply[1])
                         continue
                     if reply[0] == "error":
                         raise RuntimeError(f"Speech engine failed ({reply[1]}). Prepare the model or retry the recording.")
-                    _, value, self.loaded_model, self.fallback_reason = reply
+                    _, value, model, fallback = reply
+                    if connection is not self._connection:
+                        raise RuntimeError("This speech operation was cancelled.")
+                    self.loaded_model, self.fallback_reason = model, fallback
                     return value
                 raise RuntimeError("The speech worker stopped responding. Prepare the model again.")
             except (EOFError, BrokenPipeError, OSError) as exc:
-                self.interrupt()
+                self._interrupt_connection(connection)
                 raise RuntimeError("The speech worker stopped. Free some memory, then prepare the model or retry.") from exc
             except Exception:
-                self.interrupt()
+                self._interrupt_connection(connection)
                 raise
+
+    def _interrupt_connection(self, connection):
+        with self._lifecycle:
+            if connection is self._connection:
+                self.interrupt()
+
+    def cancellation(self):
+        with self._lifecycle:
+            connection = self._connection
+        return lambda: self._interrupt_connection(connection) if connection is not None else None
+
+    def set_finalization_deadline(self, deadline):
+        self._deadline = deadline
 
     def preload(self):
         self._start()
         self._exchange("preload", timeout=1800)
 
     def begin_session(self, hotwords=None):
+        self._deadline = None
+        self._pending = np.empty(0, dtype=np.float32)
+        self._active = False
         self._exchange("begin_session", hotwords)
+        self._active = True
 
     def accept_audio(self, audio):
+        if not self._active:
+            raise RuntimeError("No active transcription session.")
         if len(audio):
-            self._exchange("accept_audio", audio, timeout=30)
+            # WASAPI delivers roughly 10 ms blocks. One synchronous pipe round
+            # trip per block competes with capture; send 100 ms at a time.
+            self._pending = np.concatenate((self._pending, np.asarray(audio, dtype=np.float32).reshape(-1)))
+            while len(self._pending) >= 1600:
+                chunk, self._pending = self._pending[:1600], self._pending[1600:]
+                self._exchange("accept_audio", chunk, timeout=30)
 
     def finish_session(self):
-        return self._exchange("finish_session")
+        if not self._active:
+            return ""
+        try:
+            if len(self._pending):
+                self._exchange("accept_audio", self._pending)
+            return self._exchange("finish_session")
+        finally:
+            self._active = False
+            self._pending = np.empty(0, dtype=np.float32)
+
+    def transcribe_batch(self, audio):
+        """Offline comparison using the same loaded Whisper weights and options."""
+        self._deadline = None
+        return self._exchange("transcribe_batch", audio)
 
     def abort_session(self):
+        self._active = False
+        self._pending = np.empty(0, dtype=np.float32)
         if self._connection is not None:
             self._exchange("abort_session", timeout=2)
 
@@ -159,9 +218,15 @@ class ManagedTranscriber:
             self._exchange("options", (language, beam_size, vad_filter))
 
     def interrupt(self):
+        with self._lifecycle:
+            self._interrupt_locked()
+
+    def _interrupt_locked(self):
         # Deliberately does not acquire the RPC lock: cancellation must unblock recv.
         process, connection = self._process, self._connection
         self._process = self._connection = None
+        self._active = False
+        self._pending = np.empty(0, dtype=np.float32)
         self.loaded_model = ""
         if process is not None and process.poll() is None:
             process.terminate()

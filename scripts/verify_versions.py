@@ -14,4 +14,7 @@ files = {'desktop/package.json': json.loads((root / 'desktop/package.json').read
          'voiceprompt/__init__.py': re.search(r'__version__ = "([^"]+)"', (root / 'voiceprompt/__init__.py').read_text())[1]}
 for name, value in files.items():
     if value != version: raise SystemExit(f'{name}: {value} differs from canonical version {version}')
+settings_source = (root / 'desktop/src/pages/Settings.tsx').read_text(encoding='utf-8')
+if 'Version {appVersion}' not in settings_source or 'version as appVersion' not in settings_source:
+    raise SystemExit('Settings must display the package version, not a hardcoded release number.')
 print(f'Build metadata agrees on {version}.')

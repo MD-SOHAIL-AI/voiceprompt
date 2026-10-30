@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ExternalLink, Save } from "lucide-react";
-import { openLink, refresh } from "../lib/backend";
+import { openLink } from "../lib/backend";
 import { notify, useApp } from "../store";
 import type { Settings } from "../types";
 import { Button, Field, Toggle, useAction } from "../components/ui";
 import { AppearanceSettings } from "../components/AppearanceSettings";
+import { version as appVersion } from "../../package.json";
 
 export function SettingsPage() {
   const saved = useApp((s) => s.settings)!,
     planner = useApp((s) => s.planner),
-    credentials = useApp((s) => s.data?.credentials);
+    runtime = useApp((s) => s.runtime);
   const action = useAction();
+  const baseline = useRef(saved);
   const [form, setForm] = useState<Settings>(() => structuredClone(saved)),
     [dictionary, setDictionary] = useState(() =>
       Object.entries(saved.replacements)
@@ -54,12 +56,20 @@ export function SettingsPage() {
       !(await action.run("planner.preferences", { timezone: zone }))
     )
       return;
-    if (
-      await action.run("settings.save", { settings: { ...form, replacements } })
-    )
+    const draft = { ...form, replacements };
+    const patch = Object.fromEntries(
+      Object.entries(draft).filter(
+        ([key, value]) =>
+          JSON.stringify(value) !==
+          JSON.stringify(baseline.current[key as keyof Settings]),
+      ),
+    );
+    if (await action.run("settings.save", { settings: patch })) {
+      baseline.current = structuredClone(draft);
       notify(
         "Settings queued. They apply after any current recording finishes.",
       );
+    }
   }
   return (
     <section>
@@ -74,10 +84,29 @@ export function SettingsPage() {
           Save settings
         </Button>
       </header>
-      <div className="settings-sections">
+      <fieldset
+        className="settings-sections"
+        aria-label="Settings preferences"
+        disabled={action.pending}
+        style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+      >
         <AppearanceSettings />
         <section className="settings-section">
           <h2>Recording</h2>
+          <div className="button-row">
+            <Button
+              disabled={action.pending || runtime?.working}
+              onClick={() => void action.run("sound.preview", { cue: "start" })}
+            >
+              Preview start click
+            </Button>
+            <Button
+              disabled={action.pending || runtime?.working}
+              onClick={() => void action.run("sound.preview", { cue: "stop" })}
+            >
+              Preview release click
+            </Button>
+          </div>
           <div className="form-grid">
             {select("hotkey", "Recording key", [
               ["right_ctrl", "Right Ctrl"],
@@ -175,11 +204,12 @@ export function SettingsPage() {
                 ["wasapi", "WASAPI"],
                 ["mme", "MME"],
               ])}
-              <Field label="CPU threads">
+              <Field label="Whisper / Parakeet CPU threads">
                 <input
                   type="number"
                   min="1"
                   max="12"
+                  disabled={!["whisper", "parakeet"].includes(form.backend)}
                   value={form.cpu_threads}
                   onChange={(e) => set("cpu_threads", Number(e.target.value))}
                 />
@@ -199,6 +229,14 @@ export function SettingsPage() {
               checked={form.vad_filter}
               onChange={(value) => set("vad_filter", value)}
             />
+            {form.backend === "whisper" && (
+              <Toggle
+                label="Process phrases while speaking (preview)"
+                hint="Optional local optimization. Keep off unless it improves speed and accuracy on this computer."
+                checked={form.whisper_phrase_decoding}
+                onChange={(value) => set("whisper_phrase_decoding", value)}
+              />
+            )}
             <Toggle
               label="RNNoise suppression"
               checked={form.noise_suppression}
@@ -266,104 +304,21 @@ export function SettingsPage() {
           )}
         </section>
         <section className="settings-section">
-          <h2>Optional text cleanup</h2>
-          {select("cleanup_provider", "Cleanup provider", [
-            ["none", "Off · keep text on this device"],
-            ["gemini", "Gemini"],
-            ["openrouter", "OpenRouter"],
-          ])}
-          <p className="muted">
-            Enabling cleanup sends completed transcript text to the selected
-            provider. Audio stays on your computer.
-          </p>
-          <div className="form-grid">
-            <Field label="Gemini model">
-              <input
-                value={form.gemini_model}
-                onChange={(e) => set("gemini_model", e.target.value)}
-              />
-            </Field>
-            <Field label="OpenRouter model">
-              <input
-                value={form.openrouter_model}
-                onChange={(e) => set("openrouter_model", e.target.value)}
-              />
-            </Field>
-            <Field label="Cleanup timeout (seconds)">
-              <input
-                type="number"
-                min="1"
-                max="15"
-                step="0.5"
-                value={form.cleanup_timeout_seconds}
-                onChange={(e) =>
-                  set("cleanup_timeout_seconds", Number(e.target.value))
-                }
-              />
-            </Field>
-          </div>
-          <div className="credential-forms">
-            {(["gemini", "openrouter"] as const).map((provider) => (
-              <form
-                key={provider}
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const element = e.currentTarget;
-                  const fields = new FormData(element);
-                  if (
-                    await action.run("credential.save", {
-                      provider,
-                      key: fields.get("key"),
-                    })
-                  ) {
-                    element.reset();
-                    await refresh();
-                    notify("Provider key saved in Windows Credential Manager.");
-                  }
-                }}
-              >
-                <Field
-                  label={`${provider === "gemini" ? "Gemini" : "OpenRouter"} API key`}
-                  hint={
-                    credentials?.[provider]
-                      ? "A key is available. Its value is never returned to this interface."
-                      : "No key is available."
-                  }
-                >
-                  <input
-                    type="password"
-                    name="key"
-                    required
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </Field>
-                <div className="button-row">
-                  <Button type="submit" disabled={action.pending}>
-                    Save key
-                  </Button>
-                  <Button
-                    disabled={action.pending || !credentials?.[provider]}
-                    onClick={async () => {
-                      if (await action.run("credential.remove", { provider })) {
-                        await refresh();
-                        notify(
-                          "Stored key removed. Environment-provided keys remain available to source launches.",
-                        );
-                      }
-                    }}
-                  >
-                    Remove stored key
-                  </Button>
-                </div>
-              </form>
-            ))}
-          </div>
-        </section>
-        <section className="settings-section">
           <h2>VoicePrompt</h2>
+          {runtime?.credentialWarning && (
+            <div className="notice warning" role="status">
+              <p>{runtime?.credentialWarning}</p>
+              <Button
+                disabled={action.pending}
+                onClick={() => void action.run("privacy.retire_credentials")}
+              >
+                Retry old credential removal
+              </Button>
+            </div>
+          )}
           <p className="muted">
-            Version 0.5.1 · local Windows voice typing and daily focus tools
+            Version {appVersion} · local Windows voice typing and daily focus
+            tools
           </p>
           <div className="button-row">
             <Button
@@ -388,7 +343,7 @@ export function SettingsPage() {
             </Button>
           </div>
         </section>
-      </div>
+      </fieldset>
       <div className="settings-save-footer">
         <Button
           tone="primary"

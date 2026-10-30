@@ -1,7 +1,13 @@
 #ifndef AppVersion
-  #define AppVersion "0.5.1"
+  #define AppVersion "0.5.2"
 #endif
 #define RepoRoot AddBackslash(SourcePath) + ".."
+#if !defined(SignedRelease) && !defined(UnsignedPreview)
+  #error Specify SignedRelease or UnsignedPreview through scripts/build_desktop.ps1.
+#endif
+#if defined(SignedRelease) && defined(UnsignedPreview)
+  #error SignedRelease and UnsignedPreview are mutually exclusive.
+#endif
 
 [Setup]
 AppId={{C6514AAC-8670-440C-A62D-F0E6EBBE04D1}
@@ -21,7 +27,14 @@ WizardStyle=modern
 DisableProgramGroupPage=yes
 LicenseFile={#RepoRoot}\LICENSE
 OutputDir={#RepoRoot}\release
+#ifdef UnsignedPreview
+OutputBaseFilename=VoicePrompt-Setup-{#AppVersion}-x64-unsigned-preview
+#else
 OutputBaseFilename=VoicePrompt-Setup-{#AppVersion}-x64
+SignTool=voiceprompt
+SignedUninstaller=yes
+SignedUninstallerDir={#SignedUninstallerPath}
+#endif
 SetupIconFile={#RepoRoot}\build\VoicePrompt.ico
 UninstallDisplayIcon={app}\VoicePrompt.exe
 Compression=lzma2/normal

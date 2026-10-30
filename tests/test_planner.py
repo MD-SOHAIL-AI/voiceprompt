@@ -35,6 +35,12 @@ class PlannerTests(unittest.TestCase):
     def notifications(self):
         return [n for n in self.service.snapshot()["notifications"] if not n["dismissed"]]
 
+    def test_invalid_task_dates_cannot_break_the_scheduler(self):
+        for due in ("tomorrow", float("nan"), True, {}):
+            with self.assertRaises(ValueError): self.service.save_task("invalid", due=due)
+        self.assertEqual(self.service.snapshot()["tasks"], [])
+        self.service.tick()
+
     def put_contest(self, **overrides):
         contest = {"id": "clist:42", "name": "Weekly Contest", "platform": "leetcode", "source": "clist",
                    "url": "https://leetcode.com/contest/weekly-contest-42/", "start": self.clock.wall + 600,

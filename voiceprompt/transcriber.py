@@ -36,6 +36,7 @@ class LocalTranscriber:
         vad_filter: bool = False,
         fallback_model_name: str = "base.en",
         cpu_threads: int = 4,
+        phrase_decoding: bool = False,
     ) -> None:
         self.model_name = model_name
         self.language = language or None
@@ -45,11 +46,14 @@ class LocalTranscriber:
         self.vad_filter = vad_filter
         self.fallback_model_name = fallback_model_name
         self.cpu_threads = cpu_threads
+        self.phrase_decoding = phrase_decoding
         self.loaded_model = ""
         self.fallback_reason = ""
         self.backend_name = "whisper"
-        self.streaming = False
+        self.streaming = phrase_decoding
         self._frames: list[np.ndarray] = []
+        self._phrases = None
+        self._texts = []
         self._hotwords: str | None = None
         self._warmed = False
         self._model: WhisperModel | None = None
@@ -58,6 +62,9 @@ class LocalTranscriber:
     def preload(self) -> None:
         self._get_model()
         if not self._warmed:
+            if self.phrase_decoding or self.vad_filter:
+                from faster_whisper.vad import get_vad_model
+                get_vad_model()(np.zeros(512, dtype=np.float32))
             # Execute decoding once, instead of only mapping weights into memory.
             list(self._model.transcribe(
                 np.zeros(16000, dtype=np.float32), language=self.language,
@@ -67,21 +74,46 @@ class LocalTranscriber:
             self._warmed = True
 
     def begin_session(self, hotwords: str | None = None) -> None:
+        if not self.phrase_decoding:
+            self._frames = []
+            self._hotwords = hotwords
+            return
+        from faster_whisper.vad import get_speech_timestamps, VadOptions
+        from voiceprompt.phrases import PhraseBuffer
         self._frames = []
+        self._texts = []
+        options = VadOptions(min_speech_duration_ms=0, min_silence_duration_ms=300, speech_pad_ms=200)
+        self._phrases = PhraseBuffer(lambda audio: get_speech_timestamps(audio, options))
         self._hotwords = hotwords
 
     def accept_audio(self, audio: np.ndarray) -> None:
-        if len(audio):
-            self._frames.append(audio)
+        if not self.phrase_decoding:
+            if len(audio): self._frames.append(audio)
+            return
+        if self._phrases is None:
+            raise RuntimeError("No active transcription session.")
+        for phrase in self._phrases.push(audio):
+            text = self.transcribe(phrase, self._hotwords)
+            if text: self._texts.append(text)
 
     def finish_session(self) -> str:
-        frames, self._frames = self._frames, []
-        if not frames:
+        if not self.phrase_decoding:
+            frames, self._frames = self._frames, []
+            return self.transcribe(np.concatenate(frames), self._hotwords) if frames else ""
+        if self._phrases is None:
             return ""
-        return self.transcribe(np.concatenate(frames), self._hotwords)
+        try:
+            for phrase in self._phrases.push(np.empty(0, dtype=np.float32), final=True):
+                text = self.transcribe(phrase, self._hotwords)
+                if text: self._texts.append(text)
+            return " ".join(self._texts).strip()
+        finally:
+            self.abort_session()
 
     def abort_session(self) -> None:
         self._frames = []
+        self._phrases = None
+        self._texts = []
 
     def close(self) -> None:
         self.abort_session()
@@ -263,4 +295,5 @@ def create_transcriber(settings: Settings) -> TranscriptionBackend:
         model_name=settings.model, language=settings.language, device=settings.device,
         compute_type=settings.compute_type, beam_size=settings.beam_size,
         vad_filter=settings.vad_filter, cpu_threads=settings.cpu_threads,
+        phrase_decoding=settings.whisper_phrase_decoding,
     )

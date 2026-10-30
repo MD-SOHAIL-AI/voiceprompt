@@ -41,6 +41,11 @@ class AudioQueue:
         with self._condition:
             return self._seconds
 
+    @property
+    def empty(self):
+        with self._condition:
+            return not self._chunks
+
     def put(self, audio: np.ndarray, sample_rate: int):
         seconds = len(audio) / sample_rate
         with self._condition:
@@ -94,6 +99,7 @@ class DictationSession:
     finalization_timeout: float = FINALIZATION_TIMEOUT_SECONDS
     stop_reason: StopReason = StopReason.RELEASED
     target_window: int = 0
+    phase: str = "starting"
     _release_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def request_release(self, reason: StopReason = StopReason.RELEASED):
@@ -112,39 +118,63 @@ class DictationSession:
         capture_done = threading.Event()
         valid_recording = threading.Event()
         errors, result = [], []
+        recording = None
         decoding_seconds = 0.0
+        decoded_audio_seconds = 0.0
 
         def decode():
-            nonlocal decoding_seconds
+            nonlocal decoding_seconds, decoded_audio_seconds
             try:
+                # Stream creation can stall in native code. Start capture first
+                # and keep those initial words in the queue while it completes.
+                if self.cancel.is_set():
+                    return
+                then = time.perf_counter()
+                backend.begin_session(hotwords)
+                self.metrics["session_setup_seconds"] = time.perf_counter() - then
+                self.phase = "recognizing"
                 while not self.cancel.is_set():
                     chunk = self.audio_queue.get()
                     if chunk is not None:
-                        audio, _ = chunk
+                        audio, rate = chunk
                         then = time.perf_counter()
-                        backend.accept_audio(processor.process(audio))
+                        processed = processor.process(audio)
+                        after_processing = time.perf_counter()
+                        self.metrics["preprocessing_seconds"] = self.metrics.get("preprocessing_seconds", 0) + after_processing - then
+                        backend.accept_audio(processed)
                         decoding_seconds += time.perf_counter() - then
-                    elif capture_done.is_set():
+                        decoded_audio_seconds += len(audio) / rate
+                    elif capture_done.is_set() and self.audio_queue.empty:
+                        # A callback may enqueue the release tail between an
+                        # empty read and capture_done. Recheck under the queue's
+                        # lock after observing completion before finalizing.
                         break
                 if valid_recording.is_set() and not self.cancel.is_set():
+                    self.phase = "finalizing"
                     then = time.perf_counter()
                     backend.accept_audio(processor.process(np.empty(0, dtype=np.float32), final=True))
                     result.append(backend.finish_session())
+                    self.metrics["native_finalization_seconds"] = time.perf_counter() - then
                     decoding_seconds += time.perf_counter() - then
             except Exception as exc:
                 errors.append(exc)
+            finally:
+                # The decoder owns processing. Even if interruption outlives
+                # the capture thread's join, native denoiser state is released.
+                if processor is not None:
+                    processor.close()
 
         try:
             if self.cancel.is_set() or self.release.is_set():
                 return "", 0.0
-            backend.begin_session(hotwords)
+            capture_started = time.perf_counter()
             recorder.prepare()
             processor = AudioProcessor(recorder.sample_rate, noise_suppression)
             recorder.on_audio_chunk = self.audio_queue.put
             if self.cancel.is_set() or self.release.is_set():
-                backend.abort_session()
                 return "", 0.0
             recorder.start()
+            self.metrics["capture_start_seconds"] = time.perf_counter() - capture_started
             self._feedback(on_recording_started)
             started = time.perf_counter()
             decoder = threading.Thread(target=decode, name=f"recognition-{self.session_id}", daemon=True)
@@ -161,18 +191,25 @@ class DictationSession:
                 self.request_release(StopReason.CANCELLED)
                 raise IncompleteRecording("Recording cancelled.")
             recording = recorder.stop(released_at=self.released_at)
+            self.metrics["backlog_at_release_seconds"] = self.audio_queue.seconds
             self._check_capture(recorder)
             self._feedback(on_recording_stopped)
             if recording is not None:
                 valid_recording.set()
             capture_done.set()
-            deadline = time.perf_counter() + self.finalization_timeout
+            deadline = self.released_at + self.finalization_timeout
+            self.phase = "draining" if self.audio_queue.seconds else self.phase
+            set_deadline = getattr(backend, "set_finalization_deadline", None)
+            if callable(set_deadline):
+                set_deadline(time.monotonic() + max(0, deadline - time.perf_counter()))
             while decoder.is_alive():
                 if self.cancel.is_set() or time.perf_counter() >= deadline:
                     self.stop_reason = StopReason.CANCELLED if self.cancel.is_set() else StopReason.TIMEOUT
                     self._interrupt(backend)
                     raise IncompleteRecording("Recording cancelled." if self.cancel.is_set() else
                                               "Recognition took too long. Your recording is available to retry.")
+                if on_progress:
+                    on_progress(recording.duration_seconds if recording else 0, self.audio_queue.seconds, bool(errors))
                 decoder.join(0.02)
             if errors:
                 self.stop_reason = StopReason.RECOGNITION_FAILED
@@ -195,6 +232,7 @@ class DictationSession:
                     pass
             raise
         finally:
+            self.phase = "complete"
             recorder.on_audio_chunk = None
             if recorder.is_recording:
                 recorder.stop(grace=False)
@@ -202,6 +240,9 @@ class DictationSession:
                 processor.close()
             self.metrics.update(
                 stop_reason=self.stop_reason.value, decoding_seconds=decoding_seconds,
+                decoded_audio_seconds=decoded_audio_seconds,
+                recording_seconds=recording.duration_seconds if recording is not None else 0.0,
+                processing_ratio=decoding_seconds / max(decoded_audio_seconds, .001),
                 queue_peak_seconds=self.audio_queue.peak_seconds, queue_overflow=self.audio_queue.overflow,
                 input_overflows=recorder.input_overflows, capture_open_seconds=recorder.capture_open_seconds,
                 input_latency_seconds=recorder.input_latency_seconds, capture_host_api=recorder.host_api,

@@ -6,12 +6,12 @@ import threading
 import time
 import traceback
 import os
-from concurrent.futures import ThreadPoolExecutor
+import logging
+from concurrent.futures import ThreadPoolExecutor, CancelledError
 from dataclasses import replace
 
 from voiceprompt.audio import RNNoise
-from voiceprompt.cleanup import CloudCleanup
-from voiceprompt.config import Settings, config_dir, history_path, load_settings, save_settings
+from voiceprompt.config import Settings, config_dir, history_path, load_settings, save_settings, validate_settings
 from voiceprompt.diagnostics import Diagnostics
 from voiceprompt.history import TranscriptionHistory
 from voiceprompt.hotkeys import PushToTalkHotkey
@@ -38,7 +38,13 @@ class VoicePromptApp:
         self.settings.startup_on_boot = startup_enabled() if not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") else False
         if self.settings.startup_on_boot:
             set_startup(True)  # Refresh an existing startup entry to use the local environment.
-        save_settings(self.settings)
+        initial_storage_warning = ""
+        try:
+            save_settings(self.settings)
+        except OSError:
+            initial_storage_warning = "Settings are readable but could not be saved. Check available disk space and folder permissions."
+        from voiceprompt.credentials import retire_cloud_credentials
+        self.credential_warning = retire_cloud_credentials()
         self.status = "idle"
         self.last_error = ""
         self.detail = "Prepare your microphone and model to begin."
@@ -47,6 +53,7 @@ class VoicePromptApp:
         self.elapsed_seconds = 0.0
         self.backlog_seconds = 0.0
         self.download_progress = {}
+        self.storage_warning = initial_storage_warning
         self._failed_audio = None
         self._preparation_cancelled = False
         self._control = threading.RLock()
@@ -59,8 +66,11 @@ class VoicePromptApp:
         self._quitting = False
         self.shutdown_requested = lambda: False
         self._current_id = 0
+        self._work_started_at = 0.0
         self._session: DictationSession | None = None
         self._pending_settings: Settings | None = None
+        self._desired_settings = copy.deepcopy(self.settings)
+        self._settings_revision = self._applied_settings_revision = 0
         self.sounds = SoundFeedback()
         self._planner_error = ""
         try:
@@ -73,9 +83,11 @@ class VoicePromptApp:
         self.recorder = self._new_recorder(self.settings)
         self.transcriber = create_transcriber(self.settings)
         self.injector = TextInjector(preserve_clipboard=self.settings.preserve_clipboard)
-        self.cleanup = self._new_cleanup(self.settings)
         self.history = TranscriptionHistory(history_path(), limit=self.settings.max_history)
-        self.latest_text = self.history.last()
+        try:
+            self.latest_text = self.history.last()
+        except (OSError, ValueError):
+            self.storage_warning = "History could not be read. Its original file has been kept; voice typing is still available."
         self.diagnostics = Diagnostics(config_dir())
         self.hotkey = self._new_hotkey(self.settings)
         pill_factory, tray_factory = presentation or (FloatingPill, TrayApp)
@@ -88,7 +100,7 @@ class VoicePromptApp:
         self.tray = tray_factory(
             get_status=self.get_status, get_last_error=lambda: self.last_error,
             get_settings=lambda: self.settings, on_settings_saved=self.update_settings,
-            on_retry=self.retry_last, on_toggle_cleanup=self.toggle_cleanup,
+            on_retry=self.retry_last,
             on_toggle_startup=self.toggle_startup, on_preload_model=self.preload_model,
             on_quit=self.quit, get_runtime_info=self.runtime_info,
             on_planner=self.open_planner,
@@ -138,19 +150,19 @@ class VoicePromptApp:
         self.pill.call(lambda: self._planner_ui.close() if self._planner_ui else None)
         self.sounds.close()
         self.pill.stop()
-        self._executor.submit(self._close_resources)
+        try:
+            self._executor.submit(self._close_resources)
+        except RuntimeError:
+            self._close_resources()
         self._executor.shutdown(wait=False)
 
     def _close_resources(self) -> None:
         try:
-            if self.planner is not None:
-                self.planner.close()
-            try:
-                self.recorder.close()
-            finally:
-                self.transcriber.close()
-                self.injector.cancel_restore()
-                self.diagnostics.close()
+            callbacks = [self.recorder.close, self.transcriber.close, self.injector.cancel_restore, self.diagnostics.close]
+            if self.planner is not None: callbacks.insert(0, self.planner.close)
+            for callback in callbacks:
+                try: callback()
+                except Exception: logging.getLogger(__name__).warning("A resource could not close normally")
         finally:
             self._audio_worker.close()
 
@@ -184,8 +196,30 @@ class VoicePromptApp:
 
     def _begin_work(self) -> int:
         self._working = True
+        self._work_started_at = time.perf_counter()
         self._current_id += 1
         return self._current_id
+
+    def _submit_work(self, sid, worker, *args):
+        def failed(future):
+            try:
+                error = future.exception()
+            except CancelledError as exc:
+                error = exc
+            if error is not None:
+                with self._control:
+                    if self._quitting or sid != self._current_id: return
+                    self._ready = False
+                    self._record_error(RuntimeError("The audio worker could not finish. Restart the engine to recover."))
+                    self._complete_work(sid)
+        try:
+            future = self._executor.submit(worker, *args)
+        except RuntimeError:
+            self._ready = False
+            self._record_error(RuntimeError("The audio worker is unavailable. Restart the engine to recover."))
+            self._complete_work(sid)
+            return
+        future.add_done_callback(failed)
 
     def preload_model(self) -> None:
         with self._control:
@@ -196,9 +230,11 @@ class VoicePromptApp:
             self._preparation_cancelled = False
             self.detail = "Preparing model and microphone. Speak after Ready appears."
             self.set_status("loading model", sid)
-            self._executor.submit(self._preload_worker, sid)
+            self._submit_work(sid, self._preload_worker, sid)
 
     def _prepare(self) -> None:
+        if self._preparation_cancelled or self._quitting:
+            raise RuntimeError("Preparation cancelled. Select Prepare to try again.")
         self.transcriber.progress = self._download_progress
         self.transcriber.preload()
         if self._preparation_cancelled or self._quitting:
@@ -215,7 +251,7 @@ class VoicePromptApp:
             self.last_error = ""
             self.download_progress = {}
             self.detail = "Hold your recording key, speak, then release to paste."
-            self.diagnostics.record(
+            self._record_metrics(
                 "ready", backend=self.transcriber.backend_name, model=self.transcriber.loaded_model,
                 warmup_seconds=time.perf_counter() - started,
                 capture_open_seconds=self.recorder.capture_open_seconds,
@@ -252,7 +288,7 @@ class VoicePromptApp:
             settings = copy.deepcopy(self.settings)
             self.detail = "Starting microphone…"
             self.set_status(SessionState.STARTING.value, sid)
-            self._executor.submit(self._dictation_worker, session, settings)
+            self._submit_work(sid, self._dictation_worker, session, settings)
 
     def stop_recording(self) -> None:
         with self._control:
@@ -286,36 +322,49 @@ class VoicePromptApp:
                 return
             self.set_status("transcribing", sid)
             source = self.transcriber.backend_name
-            if text.strip() and self.cleanup.enabled and self.cleanup.available:
-                self.set_status("cleaning", sid)
-                text = self.cleanup.clean(text)
-                source += f"+{settings.cleanup_provider}"
             text = apply_replacements(text, settings.replacements)
+            self._validate_transcript(session, text)
             # Guard final insertion against quit/stale workers. Never paste partials.
             with self._control:
                 if self._quitting or sid != self._current_id or session.cancel.is_set():
                     return
                 if text.strip():
                     self.latest_text = text
-                    self.history.add(text, duration_seconds=duration, source=source)
+                    self._save_history(text, duration, source)
             if text.strip() and settings.paste_injection:
                 self.detail = "Release the recording key and any modifiers to finish pasting."
+                paste_deadline = time.monotonic() + 2.0
+                modifiers_released = True
+                wait_started = time.perf_counter()
                 while getattr(self.hotkey, "pressed", False) is True or modifiers_down():
                     if self._quitting or session.cancel.wait(0.02):
                         return
+                    if time.monotonic() >= paste_deadline:
+                        modifiers_released = False
+                        break
+                session.metrics["paste_wait_seconds"] = time.perf_counter() - wait_started
                 with self._control:
                     if self._quitting or session.cancel.is_set() or sid != self._current_id:
                         return
-                    if session.target_window and foreground_window() == session.target_window:
-                        pasted_at = self.injector.inject(text)
+                    paste_allowed = modifiers_released and session.target_window and foreground_window() == session.target_window
+                if paste_allowed:
+                    try:
+                        pasted_at = self.injector.inject(text, target_window=session.target_window,
+                            cancelled=lambda: self._quitting or session.cancel.is_set() or sid != self._current_id)
+                    except Exception:
+                        outcome = "text"
+                        self.insertion_status = "copy"
+                        self.detail = "Automatic paste could not finish. Your text is ready to Copy."
+                    else:
                         session.metrics["release_to_paste_seconds"] = pasted_at - session.released_at
                         outcome = "pasted"
                         self.insertion_status = "pasted"
                         self.detail = "Text pasted. Hold your recording key to dictate again."
-                    else:
-                        outcome = "text"
-                        self.insertion_status = "copy"
-                        self.detail = "Text ready. The active window changed; use Copy to insert it where you want."
+                else:
+                    outcome = "text"
+                    self.insertion_status = "copy"
+                    self.detail = ("Text ready. Release your modifiers and use Copy to insert it." if not modifiers_released else
+                                   "Text ready. The active window changed; use Copy to insert it where you want.")
             else:
                 outcome = "text" if text.strip() else "empty"
                 self.insertion_status = "copy" if text.strip() else "none"
@@ -323,20 +372,24 @@ class VoicePromptApp:
             self.last_error = ""
             if session.stop_reason == StopReason.DURATION_LIMIT:
                 self.detail = "Five-minute recording limit reached. " + self.detail
+            if not text.strip() and duration > 0:
+                self._failed_audio = session.audio_queue.retained() or None
+                if self._failed_audio:
+                    self.detail = "No speech recognized. Retry the recording, or check your microphone and noise suppression."
             session.audio_queue.clear()
         except Exception as exc:
+            self._ready = False
             if not self._quitting:
                 self._record_error(exc)
             outcome = "incomplete" if isinstance(exc, IncompleteRecording) else "error"
             if session.stop_reason not in {StopReason.CANCELLED, StopReason.CAPTURE_FAILED}:
                 self._failed_audio = session.audio_queue.retained() or None
-            if session.metrics.get("capture_failed"):
-                self._ready = False
+            if session.stop_reason == StopReason.CAPTURE_FAILED:
                 self.recorder.close()
             if not isinstance(exc, IncompleteRecording) or session.stop_reason in {StopReason.RECOGNITION_FAILED, StopReason.TIMEOUT}:
                 self._ready = False
         finally:
-            self.diagnostics.record(
+            self._record_metrics(
                 "dictation", session_id=sid, backend=self.transcriber.backend_name,
                 model=self.transcriber.loaded_model, noise_suppression=settings.noise_suppression,
                 outcome=outcome, **session.metrics,
@@ -358,9 +411,12 @@ class VoicePromptApp:
 
     def _recording_progress(self, session, elapsed, backlog, failed):
         with self._control:
-            if session.session_id != self._current_id or self._quitting or session.release.is_set():
+            if session.session_id != self._current_id or self._quitting:
                 return
             self.elapsed_seconds, self.backlog_seconds = elapsed, backlog
+            if session.release.is_set():
+                self.detail = (f"Finishing your recording — {backlog:.1f}s of audio remaining." if backlog >= .1 else "Finalizing the complete transcript…")
+                return
             state = SessionState.CATCHING_UP if backlog >= 2 or failed else SessionState.LISTENING
             if failed:
                 self.detail = "Listening. Recognition stopped; release the key, then retry your recording."
@@ -391,19 +447,25 @@ class VoicePromptApp:
 
     def cancel_current(self):
         with self._control:
+            self._ready = False  # Interrupt destroys the loaded speech worker.
             if self._session is not None:
                 self._session.cancel.set()
                 self._session.request_release(StopReason.CANCELLED)
             elif self._working:
                 self._preparation_cancelled = True
             self.detail = "Cancelling…"
-        threading.Thread(target=self.transcriber.interrupt, name="cancel-recognition", daemon=True).start()
+        cancellation = getattr(self.transcriber, "cancellation", None)
+        target = cancellation() if callable(cancellation) else self.transcriber.interrupt
+        threading.Thread(target=target, name="cancel-recognition", daemon=True).start()
 
     def discard_failed(self):
-        self._failed_audio = None
-        self.last_error = ""
-        self.detail = "Recording discarded. Prepare the model or start a new recording."
-        self.set_status("ready" if self._ready else "idle")
+        with self._control:
+            if self._working:
+                raise ValueError("Cancel the current operation before discarding a recording.")
+            self._failed_audio = None
+            self.last_error = ""
+            self.detail = "Recording discarded. Prepare the model or start a new recording."
+            self.set_status("ready" if self._ready else "idle")
 
     def retry_failed(self):
         with self._control:
@@ -418,30 +480,61 @@ class VoicePromptApp:
             self.last_error = ""
             self.set_status("transcribing", sid)
             self.detail = "Retrying the saved recording. The microphone is off."
-            self._executor.submit(self._retry_audio_worker, session, chunks)
+            self._submit_work(sid, self._retry_audio_worker, session, chunks)
 
     def _retry_audio_worker(self, session, chunks):
         from voiceprompt.session import ReplayRecorder
         sid = session.session_id
         try:
+            if session.cancel.is_set() or self._quitting:
+                return
             self.transcriber.preload()
             text, duration = session.run(ReplayRecorder(chunks, session), self.transcriber,
                                          hotwords=self._hotwords(self.settings), noise_suppression=self.settings.noise_suppression)
             text = apply_replacements(text, self.settings.replacements)
+            self._validate_transcript(session, text)
             with self._control:
                 if not self._quitting and sid == self._current_id and not session.cancel.is_set():
-                    self.latest_text = text
                     self.insertion_status = "copy" if text.strip() else "none"
                     if text.strip():
-                        self.history.add(text, duration, self.transcriber.backend_name)
-                    self._failed_audio = None
-                    self.detail = "Recording recovered. Use Copy to insert the text." if text else "No speech detected in the recovered recording."
+                        self.latest_text = text
+                        self._save_history(text, duration, self.transcriber.backend_name)
+                        self._failed_audio = None
+                    self.detail = "Recording recovered. Use Copy to insert the text." if text.strip() else "No speech recognized. Your recording is still available to retry or discard."
+            if not session.cancel.is_set() and not self._quitting:
+                # Replay loads the model; capture must also be valid before Ready.
+                self.recorder.prepare()
+                self._ready = True
         except Exception as exc:
+            self._ready = False
             if not self._quitting:
                 self._record_error(exc)
         finally:
-            self.diagnostics.record("retry", session_id=sid, **session.metrics)
+            self._record_metrics("retry", session_id=sid, **session.metrics)
             self._complete_work(sid)
+
+    def _save_history(self, text, duration, source):
+        try:
+            self.history.add(text, duration_seconds=duration, source=source)
+            self.storage_warning = ""
+        except Exception:
+            self.storage_warning = "History could not be saved. Your completed text is still available to Copy."
+
+    @staticmethod
+    def _validate_transcript(session, text):
+        if not isinstance(text, str) or len(text) > 100000:
+            session.stop_reason = StopReason.RECOGNITION_FAILED
+            raise IncompleteRecording("Recognition returned an invalid or oversized transcript. Your recording is available to retry.")
+
+    def _record_metrics(self, event, **metrics):
+        try:
+            from voiceprompt.resources import memory_metrics
+            process = getattr(self.transcriber, "_process", None)
+            metrics.update(memory_metrics(getattr(process, "pid", 0)))
+            self.diagnostics.record(event, **metrics)
+        except Exception:
+            # Diagnostics must never hold the recording state or retain resources.
+            logging.getLogger(__name__).warning("Performance diagnostics are unavailable")
 
     def check_microphone(self):
         with self._control:
@@ -451,7 +544,7 @@ class VoicePromptApp:
             self._preparation_cancelled = False
             self.detail = "Speak for three seconds to check your input level. No audio is saved."
             self.set_status("starting", sid)
-            self._executor.submit(self._microphone_worker, sid)
+            self._submit_work(sid, self._microphone_worker, sid)
 
     def _microphone_worker(self, sid):
         try:
@@ -477,24 +570,20 @@ class VoicePromptApp:
             if self._working or self._quitting:
                 return
             sid = self._begin_work()
-            self._executor.submit(self._retry_worker, sid)
+            self._submit_work(sid, self._retry_worker, sid)
 
     def _retry_worker(self, sid: int) -> None:
         try:
             text = self.history.last()
             with self._control:
                 if text and not self._quitting and sid == self._current_id:
-                    self.injector.inject(text)
+                    self.latest_text = text
+                    self.insertion_status = "copy"
+                    self.detail = "Previous transcript ready. Use Copy to choose its destination."
         except Exception as exc:
             self._record_error(exc)
         finally:
             self._complete_work(sid)
-
-    def toggle_cleanup(self) -> None:
-        with self._control:
-            settings = self._pending_settings or self.settings
-            provider = "none" if settings.cleanup_provider != "none" else "openrouter"
-            self.update_settings(replace(settings, cleanup_provider=provider))
 
     def toggle_startup(self) -> None:
         with self._control:
@@ -502,24 +591,28 @@ class VoicePromptApp:
             self.update_settings(replace(settings, startup_on_boot=not settings.startup_on_boot))
 
     def update_settings(self, settings: Settings) -> None:
+        settings = validate_settings(settings, {})
         with self._control:
             if self._quitting:
                 return
+            self._desired_settings = copy.deepcopy(settings)
+            self._settings_revision += 1
+            revision = self._settings_revision
             if self._working:
                 self._pending_settings = copy.deepcopy(settings)
                 self.tray.refresh()
-                return
+                return revision
             sid = self._begin_work()
             self.set_status("loading model", sid)
-            self._executor.submit(self._apply_settings_worker, copy.deepcopy(settings), sid)
+            self._submit_work(sid, self._apply_settings_worker, copy.deepcopy(settings), sid, revision)
+            return revision
 
-    def _apply_settings_worker(self, settings: Settings, sid: int) -> None:
+    def _apply_settings_worker(self, settings: Settings, sid: int, revision=None) -> None:
         try:
             old = self.settings
-            settings.config_version = 6
+            settings.config_version = 7
             if settings.backend in {"moonshine", "parakeet", "nemotron"}:
                 settings.language = "en"
-            settings.gemini_cleanup = settings.cleanup_provider == "gemini"
             settings.pill_position_x = old.pill_position_x
             settings.pill_position_y = old.pill_position_y
             if settings.startup_on_boot != old.startup_on_boot:
@@ -527,6 +620,7 @@ class VoicePromptApp:
             model_changed = any(getattr(old, k) != getattr(settings, k) for k in (
                 "backend", "model", "streaming_model", "device", "compute_type", "cpu_threads",
                 "nemotron_device",
+                "whisper_phrase_decoding",
             ))
             capture_changed = any(getattr(old, k) != getattr(settings, k) for k in (
                 "microphone", "capture_mode", "noise_suppression",
@@ -542,11 +636,11 @@ class VoicePromptApp:
                 self.recorder = self._new_recorder(settings)
                 self._ready = False
             with self._control:
-                self.settings = settings
                 save_settings(settings)
+                self.settings = settings
+                self._applied_settings_revision = revision if revision is not None else self._settings_revision
             self.injector.cancel_restore()
             self.injector = TextInjector(preserve_clipboard=settings.preserve_clipboard)
-            self.cleanup = self._new_cleanup(settings)
             self.history.limit = settings.max_history
             if settings.hotkey != old.hotkey:
                 self.hotkey.stop()
@@ -579,10 +673,6 @@ class VoicePromptApp:
         ))
 
     @staticmethod
-    def _new_cleanup(settings: Settings) -> CloudCleanup:
-        return CloudCleanup(settings.cleanup_provider, settings.openrouter_model, settings.gemini_model, settings.cleanup_timeout_seconds)
-
-    @staticmethod
     def _hotwords(settings: Settings) -> str:
         terms = []
         terms += [value.strip() for value in settings.replacements.values() if value.strip()]
@@ -591,7 +681,10 @@ class VoicePromptApp:
     def _record_error(self, exc: Exception) -> None:
         self.last_error = f"{type(exc).__name__}: {exc}"
         self.detail = self.last_error
-        (config_dir() / "voiceprompt.log").write_text(traceback.format_exc(), encoding="utf-8")
+        try:
+            (config_dir() / "voiceprompt.log").write_text(traceback.format_exc(), encoding="utf-8")
+        except OSError:
+            pass
         self.tray.refresh()
 
 

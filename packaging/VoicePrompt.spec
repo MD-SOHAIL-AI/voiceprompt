@@ -13,7 +13,7 @@ for package in ('faster_whisper', 'ctranslate2', 'moonshine_voice', 'sherpa_onnx
     datas += collect_data_files(package)
     binaries += collect_dynamic_libs(package)
 for distribution in ('faster-whisper', 'ctranslate2', 'moonshine-voice', 'sherpa-onnx', 'sherpa-onnx-core',
-                     'huggingface-hub', 'google-genai', 'keyring', 'PySide6-Essentials', 'shiboken6', 'numpy', 'soxr'):
+                     'huggingface-hub', 'keyring', 'PySide6-Essentials', 'shiboken6', 'numpy', 'soxr'):
     datas += copy_metadata(distribution)
 
 # Only use pyrnnoise's native DLL, never its audio/plotting Python imports.
@@ -27,7 +27,7 @@ a = Analysis([str(root / 'VoicePrompt.pyw')], pathex=[str(root)],
     binaries=binaries, datas=datas,
     hiddenimports=['voiceprompt.desktop', 'voiceprompt.backend_process', 'voiceprompt.smoke',
                    'voiceprompt.transcriber', 'voiceprompt.parakeet', 'voiceprompt.nemotron',
-                   'google.genai', 'moonshine_voice', 'sherpa_onnx',
+                   'moonshine_voice', 'sherpa_onnx',
                    'keyring.backends.Windows', 'pynput.keyboard._win32', 'pynput.mouse._win32',
                    '_cffi_backend'],
     excludes=['tkinter', 'voiceprompt.planner_ui', 'voiceprompt.settings_ui', 'voiceprompt.theme',

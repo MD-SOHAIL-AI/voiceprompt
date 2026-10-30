@@ -1198,9 +1198,6 @@ summary {
   transform: translateX(-50%);
   width: 112px;
   height: 32px;
-  transition:
-    width 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    height 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 html[data-island-translucent="true"] .island-frame {
   --muted: var(--text);
@@ -1226,7 +1223,7 @@ html[data-island-translucent="true"] .island-frame a {
     var(--island) var(--island-opacity),
     transparent
   );
-  border: 1px solid var(--button-border);
+  border: 1px solid color-mix(in srgb, var(--button-border) 75%, transparent);
   border-radius: 18px;
   padding: 0 11px;
   display: flex;
@@ -1236,6 +1233,31 @@ html[data-island-translucent="true"] .island-frame a {
   font-size: 12px;
   color: var(--text);
   user-select: none;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+  animation: island-settle 140ms ease-out;
+}
+.island-capsule:hover {
+  border-color: var(--button-border);
+}
+@keyframes island-settle {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes island-open {
+  from {
+    opacity: 0.65;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .island-capsule > svg {
   color: var(--accent);
@@ -1253,6 +1275,9 @@ html[data-island-translucent="true"] .island-frame a {
 }
 .island-capsule .numeric {
   font-size: 12px;
+  min-width: 5ch;
+  text-align: center;
+  line-height: 1;
 }
 .island-capsule:focus-visible {
   outline-offset: -3px;
@@ -1282,22 +1307,34 @@ html[data-island-translucent="true"] .island-frame a {
   flex-shrink: 0;
 }
 .mini-progress {
-  display: inline-flex;
-  width: 15px;
-  height: 15px;
-  padding: 3px;
-  border-radius: 50%;
-  background: conic-gradient(var(--accent) var(--progress), var(--track) 0);
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
   position: relative;
-  align-items: center;
-  justify-content: center;
+  place-items: center;
 }
-.mini-progress::before {
-  content: "";
+.mini-progress .mini-progress-ring {
   position: absolute;
-  inset: 3px;
-  background: var(--island);
-  border-radius: 50%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  fill: none;
+  stroke-width: 2.5;
+}
+.mini-progress-track {
+  stroke: var(--track);
+}
+.mini-progress-value {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset 500ms linear,
+    opacity 140ms ease;
+}
+.mini-progress.paused .mini-progress-value {
+  transition-duration: 140ms;
 }
 .mini-progress svg {
   position: relative;
@@ -1317,6 +1354,8 @@ html[data-island-translucent="true"] .island-frame a {
   border-radius: 18px;
   overflow: hidden;
   padding: 13px;
+  transform-origin: center bottom;
+  animation: island-open 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .island-header {
   display: flex;
@@ -1555,6 +1594,8 @@ html[data-island-translucent="true"] .island-frame a {
   );
   border-radius: 16px;
   padding: 12px 13px 8px;
+  transform-origin: center bottom;
+  animation: island-open 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .peek-copy strong {
   display: block;

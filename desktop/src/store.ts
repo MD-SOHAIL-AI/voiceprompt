@@ -16,6 +16,7 @@ interface Store {
   meter: number[];
   page: Page;
   connected: boolean;
+  settingsRecovery: boolean;
   error: string;
   toast: string;
   mutation: number;
@@ -32,6 +33,7 @@ export const useApp = create<Store>((set) => ({
   meter: Array(32).fill(0),
   page: "Dictation",
   connected: false,
+  settingsRecovery: false,
   error: "",
   toast: "",
   mutation: 0,
@@ -44,6 +46,7 @@ export const useApp = create<Store>((set) => ({
       planner: value.planner,
       settings: value.settings,
       connected: true,
+      settingsRecovery: false,
       error: "",
     }),
   setPage: (page) => set({ page }),

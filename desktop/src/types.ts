@@ -16,7 +16,6 @@ export type SessionStatus =
   | "recording"
   | "catching up"
   | "transcribing"
-  | "cleaning"
   | "error";
 export interface Settings {
   config_version: number;
@@ -37,13 +36,9 @@ export interface Settings {
   preload_model: boolean;
   paste_injection: boolean;
   preserve_clipboard: boolean;
-  cleanup_provider: "none" | "gemini" | "openrouter";
-  cleanup_timeout_seconds: number;
-  openrouter_model: string;
-  gemini_cleanup: boolean;
-  gemini_model: string;
   startup_on_boot: boolean;
   vad_filter: boolean;
+  whisper_phrase_decoding: boolean;
   max_history: number;
   recording_mode: "ptt" | "toggle";
   sound_feedback: boolean;
@@ -58,6 +53,13 @@ export interface Runtime {
   sessionId: number;
   elapsedSeconds: number;
   backlogSeconds: number;
+  storageWarning?: string;
+  credentialWarning?: string;
+  recognitionPhase?: string;
+  processingSeconds?: number;
+  operationSeconds?: number;
+  desiredSettingsRevision?: number;
+  appliedSettingsRevision?: number;
   latestText: string;
   error: string;
   detail: string;
@@ -154,6 +156,7 @@ export interface HubSnapshot {
   counts: Record<"tasks" | "alarms" | "contests", number>;
 }
 export interface HistoryItem {
+  truncated?: boolean;
   id: string;
   text: string;
   created_at: string;
@@ -161,15 +164,17 @@ export interface HistoryItem {
   source: string;
 }
 export interface Bootstrap {
-  version: 1;
+  version: 2;
+  engineGeneration?: number;
+  snapshotSequence?: number;
   settings: Settings;
   runtime: Runtime;
   planner: HubSnapshot | null;
   history: HistoryItem[];
-  credentials: Record<"gemini" | "openrouter", boolean>;
 }
 export interface EngineEvent {
-  version: 1;
+  version: 2;
+  engineGeneration: number;
   event:
     | "runtime"
     | "planner"
@@ -196,6 +201,5 @@ export const statusLabels: Record<SessionStatus, string> = {
   recording: "Listening",
   "catching up": "Listening · catching up",
   transcribing: "Finishing recording",
-  cleaning: "Cleaning text",
   error: "Needs attention",
 };

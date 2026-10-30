@@ -8,6 +8,13 @@ Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete reco
 
 Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
+[VoicePrompt 0.6.1 Beta 1](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.6.1-beta.1)
+is available for Windows 10/11 x64 testing. This public beta uses the tested 0.6.1
+build, which displays 0.6.1 in the app. Download it manually; beta releases are
+excluded from the stable update channel. The installer is unsigned, so Windows
+may show a publisher or SmartScreen warning. See the
+[beta notes](docs/release-notes-0.6.1-beta.1.md) for validation and limitations.
+
 The 0.6.0 release candidate adds local-only processing, bounded recovery and transport, safer clipboard handling, phrase decoding, and new recording clicks. See the [candidate notes](docs/release-notes-0.6.0.md) for verification and outstanding production gates.
 
 The 0.5.1 desktop redesign is available as an [unsigned Windows preview](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.5.1-preview.1). See the [release notes](docs/release-notes-0.5.1.md) for features, validation and remaining manual hardware checks. Models download separately on first preparation; cached models work offline. Main-branch pushes do not automatically publish releases.

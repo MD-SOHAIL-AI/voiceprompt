@@ -52,7 +52,7 @@ class Client:
 
     def request(self, method, **params):
         self.serial += 1
-        value = {'version': 1, 'id': self.serial, 'method': method, 'params': params}
+        value = {'version': 2, 'id': self.serial, 'method': method, 'params': params}
         self.process.stdin.write(json.dumps(value).encode('utf-8') + b'\n')
         self.process.stdin.flush()
         while True:
@@ -97,8 +97,9 @@ def main():
     client = Client(command, profile)
     try:
         state = client.request('bootstrap')
-        assert state['version'] == 1 and state['runtime']['acceptanceProfile']
-        assert state['credentials'] == {'gemini': False, 'openrouter': False}
+        assert state['version'] == 2 and state['runtime']['acceptanceProfile']
+        assert 'credentials' not in state
+        assert 'cleanup_provider' not in state['settings']
         assert state['planner'] is not None, state['runtime']['plannerError']
         if os.name == 'nt':
             duplicate = subprocess.run(command, cwd=ROOT,
@@ -108,7 +109,7 @@ def main():
             events = [json.loads(line) for line in duplicate.stdout.splitlines()]
             assert any(event.get('event') == 'fatal' and 'system tray' in event['payload']['message']
                        for event in events), 'Duplicate engine did not explain how to recover'
-            assert client.request('bootstrap')['version'] == 1, 'Duplicate launch affected the active engine'
+            assert client.request('bootstrap')['version'] == 2, 'Duplicate launch affected the active engine'
         client.request('planner.task.save', title='Persistent bridge task', notes='Disposable integration fixture')
         client.request('planner.timer.start', title='Bridge timer', seconds=120)
         timer = client.request('planner.snapshot')['timer']
@@ -137,10 +138,29 @@ def main():
         assert state['planner']['timer']['status'] == 'cancelled'
     finally:
         restarted.close()
+    damaged_profile = profile.parent / ('recovery-profile-' + uuid.uuid4().hex)
+    damaged_profile.mkdir()
+    (damaged_profile / 'config.json').write_text('{broken', encoding='utf-8')
+    damaged = Client(command, damaged_profile)
+    try:
+        fatal = damaged.messages.get(timeout=30)
+        assert fatal.get('payload', {}).get('code') == 'settings_recovery'
+        assert damaged.request('configuration.recover', mode='defaults')['ok']
+        damaged.ready = False  # Recovery deliberately exits; no shutdown RPC follows.
+    finally:
+        damaged.close()
+    recovered = Client(command, damaged_profile)
+    try:
+        state = recovered.request('bootstrap')
+        assert state['settings']['config_version'] == 7
+        assert not state['settings']['onboarding_completed']
+        assert list(damaged_profile.glob('config.unreadable.*.json'))
+    finally:
+        recovered.close()
     result = {'mode': 'frozen' if args.engine else 'source', 'passed': True,
               'checks': ['Real bootstrap', 'Credential isolation', 'Task persistence after restart',
                          'Timer pause/resume/end', 'Stale action rejection', 'Graceful shutdown',
-                         'Duplicate engine conflict and recovery guidance']}
+                         'Duplicate engine conflict and recovery guidance', 'Explicit settings recovery with preserved original']}
     (ROOT / 'build').mkdir(exist_ok=True)
     (ROOT / 'build' / ('frozen-bridge.json' if args.engine else 'source-bridge.json')).write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(result, indent=2))

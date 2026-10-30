@@ -479,10 +479,26 @@ export function Island() {
             id={`panel-${tab}`}
             aria-labelledby={`tab-${tab}`}
           >
-            {(runtime.error || error) && (
+            {(runtime.error || error || runtime.failedAudio) && (
               <div className="island-error" role="alert">
                 <AlertTriangle size={17} />
-                <p>{error || runtime.error}</p>
+                <p>{error || runtime.error || runtime.detail}</p>
+                {runtime.failedAudio && (
+                  <>
+                    <Button
+                      disabled={runtime.working || action.pending}
+                      onClick={() => void action.run("record.retry")}
+                    >
+                      Retry recording
+                    </Button>
+                    <Button
+                      disabled={runtime.working || action.pending}
+                      onClick={() => void action.run("record.discard")}
+                    >
+                      Discard
+                    </Button>
+                  </>
+                )}
                 <Button
                   onClick={() =>
                     connected

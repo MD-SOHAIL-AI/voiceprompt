@@ -39,14 +39,44 @@ class DesktopBridgeTests(unittest.TestCase):
         self.clock.mono += seconds
         self.planner.tick()
 
+    def test_large_unicode_task_notes_are_bounded_and_detail_is_preserved(self):
+        for index in range(30):
+            self.planner.save_task(str(index), "\U0001f600" * 10000)
+        snapshot = self.service.planner_snapshot()
+        self.service.writer.event("planner", snapshot)
+        self.assertLess(len(json.dumps(snapshot, ensure_ascii=False).encode()), MAX_MESSAGE_BYTES)
+        detail = self.service.planner_command("item", {"kind": "task", "id": snapshot["tasks"][0]["id"]})
+        self.assertEqual(len(detail["notes"]), 10000)
+
+    def test_large_history_page_preserves_full_text_for_copy(self):
+        for index in range(20): self.app.history.add(str(index) + "\U0001f600" * 20000)
+        page = self.service.dispatch("history.list", {})
+        self.service.writer.send(page)
+        self.assertTrue(page["items"][0]["truncated"])
+        full = self.service.dispatch("history.item", {"id": page["items"][0]["id"]})
+        self.assertGreater(len(full["text"]), len(page["items"][0]["text"]))
+
+    def test_alarm_pages_use_the_same_order_without_duplicates(self):
+        for index in range(60):
+            self.planner.save_alarm(str(index), self.clock.wall + (60-index)*60)
+        first = self.service.planner_snapshot()["alarms"]
+        second = self.service.planner_command("page", {"kind": "alarm", "offset": len(first)})["items"]
+        self.assertEqual(len({row["id"] for row in first + second}), 60)
+        self.assertEqual([row["due"] for row in first + second], sorted(row["due"] for row in first + second))
+
+    def test_oversized_event_is_reported_without_stopping_service(self):
+        self.service.emit("planner", {"notes": "x" * MAX_MESSAGE_BYTES})
+        self.assertFalse(self.service.stop.is_set())
+        self.assertIn(b'protocol-error', self.service.writer.stream.getvalue())
+
     def test_oversized_command_is_drained_and_next_command_survives(self):
-        command = {'id': 2, 'version': 1, 'method': 'runtime', 'params': {}}
+        command = {'id': 2, 'version': 2, 'method': 'runtime', 'params': {}}
         frames = list(read_messages(io.BytesIO(b'x' * (MAX_MESSAGE_BYTES + 2) + b'\n' + json.dumps(command).encode() + b'\n')))
         self.assertIsNotNone(frames[0][1])
         self.assertEqual(frames[1], (command, None))
 
     def test_invalid_protocol_inputs_do_not_become_commands(self):
-        for value in [[], {'id': True, 'version': 1, 'method': 'runtime'}, {'id': 1, 'version': True, 'method': 'runtime'}, {'id': 1, 'version': 9, 'method': 'runtime'}, {'id': 1, 'version': 1, 'method': 'runtime', 'params': []}]:
+        for value in [[], {'id': True, 'version': 2, 'method': 'runtime'}, {'id': 1, 'version': True, 'method': 'runtime'}, {'id': 1, 'version': 9, 'method': 'runtime'}, {'id': 1, 'version': 2, 'method': 'runtime', 'params': []}]:
             message, error = next(read_messages(io.BytesIO(json.dumps(value).encode() + b'\n')))
             self.assertIsNone(message)
             self.assertTrue(error)

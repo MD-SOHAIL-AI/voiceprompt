@@ -7,6 +7,7 @@ const { chromium, expect } = require("@playwright/test");
 const AxeBuilder = require("@axe-core/playwright").default;
 
 const root = path.resolve(__dirname, "../..");
+const appVersion = require("../package.json").version;
 const out = path.join(root, ".impeccable/review");
 fs.mkdirSync(out, { recursive: true });
 fs.mkdirSync(path.join(root, "build"), { recursive: true });
@@ -150,9 +151,10 @@ async function expand(tab) {
   ).toBeVisible({ timeout: 60000 });
   if (native) {
     const state = await rpc("bootstrap");
-    assert.equal(state.version, 1);
+    assert.equal(state.version, 2);
     assert.equal(state.runtime.acceptanceProfile, true);
-    assert.deepEqual(state.credentials, { gemini: false, openrouter: false });
+    assert.equal(state.credentials, undefined);
+    assert.equal(state.settings.cleanup_provider, undefined);
     report.checks.push(
       "Actual packaged bridge and isolated profile bootstrapped",
     );
@@ -167,6 +169,17 @@ async function expand(tab) {
     "Settings",
   ]) {
     await navigate(name);
+    if (name === "Settings") {
+      await expect(
+        main.getByText(
+          `Version ${appVersion} · local Windows voice typing and daily focus tools`,
+          { exact: true },
+        ),
+      ).toBeVisible();
+      report.checks.push(
+        "Settings displays the installed release version from build metadata",
+      );
+    }
     await shot(main, name.toLowerCase().replaceAll(" ", "-"));
     const result = await new AxeBuilder({ page: main })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])

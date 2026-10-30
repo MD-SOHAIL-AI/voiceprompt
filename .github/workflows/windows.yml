@@ -91,13 +91,16 @@ jobs:
           cache-on-failure: true
       - name: Install tested Python dependencies
         run: python -m pip install -r requirements-lock.txt
-      - name: Build Tauri, frozen engine and per-user installer
+      - name: Build Tauri, frozen engine and unsigned test installer
         shell: pwsh
-        run: ./scripts/build_desktop.ps1 -Python python -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+        run: ./scripts/build_desktop.ps1 -Python python -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' -AllowUnsignedPreview
       - name: Rust checks
         run: |
           cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --lib
           cargo clippy --manifest-path desktop/src-tauri/Cargo.toml --locked -- -D warnings
+      - name: Audit pinned Rust dependencies
+        shell: pwsh
+        run: ./scripts/audit_rust.ps1
       - name: Verify frozen engine persistence and protocol
         run: python scripts/check_engine_bridge.py --engine dist/VoicePrompt/engine/VoicePromptEngine.exe
       - name: Verify actual native bridge and floating controls
@@ -105,11 +108,11 @@ jobs:
         run: ./scripts/check_native.ps1 -Python python
       - name: Verify installation and live uninstall
         shell: pwsh
-        run: ./scripts/check_installer.ps1
+        run: ./scripts/check_installer.ps1 -AllowUnsignedPreview
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: VoicePrompt-windows-x64
+          name: VoicePrompt-windows-x64-unsigned-preview
           retention-days: 14
           path: |
             release/*
@@ -118,6 +121,7 @@ jobs:
             build/frozen-bridge.json
             build/installer-check.json
             build/native-checks.json
+            build/rust-audit-0.6.0.json
             build/native-*.log
             build/uninstall-*.log
             .impeccable/review/native-*.png

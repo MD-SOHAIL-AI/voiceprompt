@@ -673,7 +673,6 @@ class MainWindow(QMainWindow):
             "nemotron_device": ["vulkan", "cpu"],
             "model": ["base.en", "tiny.en", "small.en", "Systran/faster-distil-whisper-small.en", "small", "base", "tiny"],
             "streaming_model": ["tiny", "small"], "language": ["en", "auto"],
-            "cleanup_provider": ["none", "openrouter", "gemini"],
         }
         def field(name, text, target=form):
             value = getattr(settings, name)
@@ -735,17 +734,7 @@ class MainWindow(QMainWindow):
         self.dictionary.setAccessibleName("Dictionary replacements")
         self.dictionary.setMinimumHeight(130)
         layout.addWidget(self.dictionary)
-        layout.addWidget(label("Optional cloud cleanup", "heading"))
-        layout.addWidget(label("Off by default. Enabling a provider sends completed transcript text to that provider. Audio remains local.", "muted"))
-        cleanup_form = QFormLayout()
-        cleanup_form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
-        for name, text in (("cleanup_provider", "Provider"), ("openrouter_model", "OpenRouter model"), ("gemini_model", "Gemini model")):
-            field(name, text, cleanup_form)
-        self.provider_key = QLineEdit()
-        self.provider_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.provider_key.setPlaceholderText("Leave blank to keep the stored key")
-        cleanup_form.addRow("Provider API key", self.provider_key)
-        layout.addLayout(cleanup_form)
+
         self.settings_message = label("", "muted")
         layout.addWidget(self.settings_message)
         layout.addLayout(row(button("Save settings", self.save_preferences, primary=True), button("Check for updates", self.check_updates)))
@@ -777,10 +766,7 @@ class MainWindow(QMainWindow):
                 if not separator or not source.strip() or not target.strip():
                     raise ValueError("Use source=target for every dictionary replacement.")
                 pairs[source.strip()] = target.strip()
-            if self.provider_key.text().strip():
-                from voiceprompt.credentials import save_key
-                save_key(values["cleanup_provider"], self.provider_key.text())
-                self.provider_key.clear()
+
             self.controller.update_settings(replace(self.controller.settings, replacements=pairs, **values))
             self.settings_message.setText("Settings queued until this session finishes." if self.controller._session else "Saving preferences and preparing the selected engine…")
         except Exception as exc:

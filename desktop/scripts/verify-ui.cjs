@@ -66,6 +66,8 @@ async function rpc(method, params = {}) {
   );
 }
 async function expand(tab) {
+  // Theme attributes are available before the reloaded engine snapshot arrives.
+  await expect(island.locator(".island-frame")).toBeVisible({ timeout: 30000 });
   if (await island.locator(".island-capsule").isVisible())
     await island.locator(".island-capsule").click();
   else if (

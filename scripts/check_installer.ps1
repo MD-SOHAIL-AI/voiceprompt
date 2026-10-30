@@ -1,9 +1,11 @@
-param([string]$Installer = '')
+param([string]$Installer = '', [switch]$AllowUnsignedPreview)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'windows_signing.ps1')
 if (-not $Installer) {
     $version = [regex]::Match((Get-Content (Join-Path $projectRoot 'pyproject.toml') -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
-    $Installer = 'release\VoicePrompt-Setup-' + $version + '-x64.exe'
+    $suffix = if ($AllowUnsignedPreview) { '-unsigned-preview' } else { '' }
+    $Installer = 'release\VoicePrompt-Setup-' + $version + '-x64' + $suffix + '.exe'
 }
 $target = [IO.Path]::GetFullPath((Join-Path $projectRoot '.tools\installed check''s'))
 if (-not $target.StartsWith($projectRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
@@ -21,6 +23,8 @@ foreach ($name in $startupNames) {
     $startupBefore[$name] = if ($entry) { $entry.$name } else { $null }
 }
 $installerPath = (Resolve-Path -LiteralPath (Join-Path $projectRoot $Installer)).Path
+& (Join-Path $PSScriptRoot 'check_windows_signing.ps1') -Installer $installerPath -AllowUnsignedPreview:$AllowUnsignedPreview
+$expectedSigner = if ($AllowUnsignedPreview) { '' } else { (Assert-VoicePromptSignature -Path $installerPath).SignerCertificate.Thumbprint }
 $installedExe = Join-Path $target 'VoicePrompt.exe'
 $report = [ordered]@{ install = $false; reinstall = $false; workers = $false; live_uninstall = $false; runtime_startup_removed = $false; legacy_startup_removed = $false; unrelated_startup_preserved = $false; portable_preserved = $false; shortcuts_removed = $false; data_preserved = $false; uninstall = $false; startup_preserved = $false }
 $dataDirectory = Join-Path $env:LOCALAPPDATA 'VoicePrompt'
@@ -79,6 +83,11 @@ try {
         foreach ($pass in 1,2) {
             $process = Start-Process -FilePath $installerPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $target + '"'),('/MERGETASKS=desktopicon,' + $startupTask)) -WindowStyle Hidden -Wait -PassThru
             if ($process.ExitCode -ne 0) { throw "Installer pass $pass failed: $($process.ExitCode)" }
+            if (-not $AllowUnsignedPreview) {
+                foreach ($executable in @($installedExe, (Join-Path $target 'engine\VoicePromptEngine.exe'), (Join-Path $target 'unins000.exe'))) {
+                    Assert-VoicePromptSignature -Path $executable -ExpectedThumbprint $expectedSigner | Out-Null
+                }
+            }
             if ($pass -eq 1) { $report.install = $true } else { $report.reinstall = $true }
         }
         if (-not (Test-Path -LiteralPath $desktopLink) -or -not (Test-Path -LiteralPath $menuLink)) { throw 'Installer shortcuts were not created' }

@@ -13,14 +13,14 @@ for package in ('faster_whisper', 'ctranslate2', 'moonshine_voice', 'sherpa_onnx
     datas += collect_data_files(package)
     binaries += collect_dynamic_libs(package)
 for distribution in ('faster-whisper', 'ctranslate2', 'moonshine-voice', 'sherpa-onnx', 'sherpa-onnx-core',
-                     'huggingface-hub', 'google-genai', 'keyring', 'numpy', 'soxr'):
+                     'huggingface-hub', 'keyring', 'numpy', 'soxr'):
     datas += copy_metadata(distribution)
 noise = find_spec('pyrnnoise')
 if noise:
     binaries += [(str(path), 'pyrnnoise') for path in Path(noise.origin).parent.rglob('*.dll')]
 a = Analysis([str(root / 'voiceprompt/engine_entry.py')], pathex=[str(root)], binaries=binaries, datas=datas,
     hiddenimports=['voiceprompt.desktop_sidecar', 'voiceprompt.backend_process', 'voiceprompt.smoke',
-        'voiceprompt.transcriber', 'voiceprompt.parakeet', 'voiceprompt.nemotron', 'google.genai',
+        'voiceprompt.transcriber', 'voiceprompt.parakeet', 'voiceprompt.nemotron',
         'moonshine_voice', 'sherpa_onnx', 'keyring.backends.Windows', 'pynput.keyboard._win32',
         'pynput.mouse._win32', '_cffi_backend'],
     excludes=['PySide6', 'shiboken6', 'tkinter', 'voiceprompt.desktop', 'voiceprompt.planner_ui',

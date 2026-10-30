@@ -28,7 +28,7 @@ class SettingsWindow:
         notebook = ttk.Notebook(frame)
         notebook.pack(fill="both", expand=True)
         pages = {}
-        for name in ("Dictation", "Microphone", "Dictionary", "Cleanup"):
+        for name in ("Dictation", "Microphone", "Dictionary"):
             page = ScrollablePage(notebook, padding=pixels(root, 14))
             notebook.add(page, text=name)
             pages[name] = page.body
@@ -36,7 +36,7 @@ class SettingsWindow:
         values = {}
         for name in (
             "hotkey", "recording_mode", "backend", "model", "streaming_model", "language",
-            "microphone", "capture_mode", "cleanup_provider", "openrouter_model", "gemini_model",
+            "microphone", "capture_mode",
             "nemotron_device",
         ):
             values[name] = tk.StringVar(master=root, value=getattr(self.settings, name))
@@ -45,7 +45,6 @@ class SettingsWindow:
             values[name] = tk.IntVar(master=root, value=getattr(self.settings, name))
         for name in ("preload_model", "vad_filter", "preserve_clipboard", "startup_on_boot", "noise_suppression", "sound_feedback"):
             values[name] = tk.BooleanVar(master=root, value=getattr(self.settings, name))
-        values["cleanup_timeout_seconds"] = tk.DoubleVar(master=root, value=self.settings.cleanup_timeout_seconds)
 
         page = pages["Dictation"]
         self._combo(page, "Hotkey", values["hotkey"], ["right_ctrl", "left_ctrl", "right_alt", "left_alt", "f8", "f9"], 0)
@@ -87,21 +86,12 @@ class SettingsWindow:
         replacements.pack(fill="both", expand=True)
         replacements.insert("1.0", "\n".join(f"{k}={v}" for k, v in self.settings.replacements.items()))
 
-        page = pages["Cleanup"]
-        self._combo(page, "Cloud cleanup", values["cleanup_provider"], ["none", "openrouter", "gemini"], 0)
-        for row, key, label in ((1, "openrouter_model", "OpenRouter model"), (2, "gemini_model", "Gemini model")):
-            ttk.Label(page, text=label).grid(row=row, column=0, sticky="w", pady=4)
-            ttk.Entry(page, textvariable=values[key], width=28).grid(row=row, column=1, sticky="ew", pady=4)
-        self._spin(page, "Timeout (seconds)", values["cleanup_timeout_seconds"], 1, 15, 3)
-        ttk.Label(page, text="Choose none for fully local dictation and the shortest delay.\nEnabling cleanup sends transcript text to the selected provider.", wraplength=440).grid(row=4, column=0, columnspan=2, sticky="w", pady=10)
-
         def save() -> None:
             try:
                 updates = {key: variable.get() for key, variable in values.items()}
                 updates["language"] = "" if updates["language"] == "auto" else updates["language"]
                 updates["beam_size"] = max(1, min(5, int(updates["beam_size"])))
                 updates["cpu_threads"] = max(1, min(12, int(updates["cpu_threads"])))
-                updates["cleanup_timeout_seconds"] = max(1, min(15, float(updates["cleanup_timeout_seconds"])))
                 pairs = {}
                 for line in replacements.get("1.0", "end").splitlines():
                     if not line.strip():

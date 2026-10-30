@@ -1,31 +1,20 @@
-"""Provider keys use Windows Credential Manager, never the settings file."""
+"""Retire credentials belonging to the removed cloud-cleanup feature."""
+import os
+
+
 def _backend():
     from keyring.backends.Windows import WinVaultKeyring
     return WinVaultKeyring()
 
 
-def get_key(provider):
-    try:
-        return _backend().get_password("VoicePrompt.Cleanup", provider) or ""
-    except Exception:
+def retire_cloud_credentials() -> str:
+    if os.name != "nt" or os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
         return ""
-
-
-def save_key(provider, value):
-    if provider not in {"openrouter", "gemini"}:
-        raise ValueError("Select a supported cleanup provider.")
     try:
-        _backend().set_password("VoicePrompt.Cleanup", provider, value.strip())
+        vault = _backend()
+        for provider in ("gemini", "openrouter"):
+            if vault.get_password("VoicePrompt.Cleanup", provider):
+                vault.delete_password("VoicePrompt.Cleanup", provider)
+        return ""
     except Exception:
-        raise RuntimeError("Windows credential storage is unavailable. Your key was not saved.") from None
-
-
-def remove_key(provider):
-    if provider not in {"openrouter", "gemini"}:
-        raise ValueError("Select a supported cleanup provider.")
-    try:
-        backend = _backend()
-        if backend.get_password("VoicePrompt.Cleanup", provider):
-            backend.delete_password("VoicePrompt.Cleanup", provider)
-    except Exception:
-        raise RuntimeError("Windows credential storage is unavailable. Your key was not removed.") from None
+        return "Old cloud credentials could not be removed. Retry removal in Settings. Dictation remains local."

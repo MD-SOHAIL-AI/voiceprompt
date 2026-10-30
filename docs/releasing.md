@@ -1,5 +1,10 @@
 # Build and release VoicePrompt
 
+For the free in-app update channel, use the explicit update-signed release driver
+and version-tag workflow in [app updates](app-updates.md). It verifies releases
+using the app's public key without claiming a Windows publisher identity. The
+publisher-signed build path below retains its existing certificate requirement.
+
 ## Validated target
 
 Windows x64, Python 3.11, Node 24, Rust stable/MSVC with a Windows SDK,
@@ -16,10 +21,13 @@ See [Microsoft's deployment guidance](https://learn.microsoft.com/en-us/microsof
 
 1. Install `requirements-lock.txt` into a dedicated virtual environment.
 2. Run `python -m unittest discover -s tests -v` from that environment.
-3. Run `scripts/build_windows.ps1`, supplying `-Python` and `-InnoCompiler` as needed.
+3. Run `scripts/build_windows.ps1 -SignThumbprint <trusted certificate thumbprint>`,
+   supplying `-Python` and `-InnoCompiler` as needed. For testing only, explicitly
+   use `-AllowUnsignedPreview` instead of signing.
 4. Inspect `build/frozen-smoke.json`. Every selected backend must describe itself;
    the release also includes the optional RNNoise native library.
-5. The installer and its `.sha256` file appear under `release/`.
+5. The installer, `.sha256` checksum, and `.signing.json` audit appear under
+   `release/`. Unsigned test installers have an `-unsigned-preview` filename suffix.
 6. Run `scripts/check_installer.ps1` in a clean Windows account. It installs and
    reinstalls with startup enabled and disabled, then uninstalls with a live
    frozen app and speech worker. It checks normal shutdown, all installed files,
@@ -33,15 +41,17 @@ local font assets; Qt is excluded and model weights remain separate.
 
 ## Signing
 
-Supply `-SignThumbprint <certificate thumbprint>` and have Windows SDK `signtool`
-available on PATH. The build signs the application before installer compilation,
-then signs the installer and timestamps both signatures. Signing failures stop
-the build. Keep certificates, PFX files, and private keys outside the repository.
-The script never generates a publisher identity or claims an unsigned build is signed.
+See [Windows signing and SmartScreen](windows-signing.md) for identity setup and
+exact commands. A public release build requires an installed trusted certificate.
+The desktop, engine, installer and embedded uninstaller are signed and timestamped;
+signature and checksum failures stop the build. The final signing audit records
+actual identities and hashes. `check_installer.ps1` also verifies the installed
+executables and uninstaller; use `-AllowUnsignedPreview` only for unsigned tests.
 
-Code signing can require a paid certificate or a signing service. Without a supplied
-identity, publish only an explicitly labelled unsigned preview, following the checks
-below. Do not promise that signing removes every Windows reputation prompt.
+Without an identity, the default build fails before compiling or replacing files.
+An explicit `-AllowUnsignedPreview` build is for testing and may trigger SmartScreen.
+No signing method guarantees immediate SmartScreen reputation for direct downloads.
+Keep private keys and provider credentials outside the repository.
 
 ## Clean-machine acceptance
 
@@ -74,7 +84,8 @@ physical microphone/keyboard behavior or compatibility with every destination ap
 
 Target repository: https://github.com/MD-SOHAIL-AI/voiceprompt
 
-CI tests pull requests and main, builds the installer, and uploads artifacts.
+CI tests pull requests and main, builds an explicitly unsigned test installer,
+and uploads artifacts labelled `VoicePrompt-windows-x64-unsigned-preview`.
 It does not create or publish releases. Review native bridge, frozen worker,
 installer and manual acceptance evidence, signing status, notices and release
 notes before a separately authorized publication. Main-branch pushes do not
@@ -83,9 +94,11 @@ publish a release.
 For a local build, create a draft release using the checked artifact and checksum:
 
 ```powershell
-gh release create v0.5.1-preview.1 release/VoicePrompt-Setup-0.5.1-x64.exe release/VoicePrompt-Setup-0.5.1-x64.exe.sha256 --repo MD-SOHAIL-AI/voiceprompt --draft --prerelease --title "VoicePrompt 0.5.1 unsigned Windows preview" --notes-file docs/release-notes-0.5.1.md
+gh release create v0.6.0-preview.1 release/VoicePrompt-Setup-0.6.0-x64-unsigned-preview.exe release/VoicePrompt-Setup-0.6.0-x64-unsigned-preview.exe.sha256 release/VoicePrompt-Setup-0.6.0-x64-unsigned-preview.exe.signing.json --repo MD-SOHAIL-AI/voiceprompt --draft --prerelease --title "VoicePrompt 0.6.0 unsigned Windows preview" --notes-file docs/release-notes-0.6.0.md
 ```
 
-Users download from the repository's Releases page. The in-app update action opens
-the full release list so both published previews and stable builds are discoverable.
-An update uses the same installer and leaves user data in place.
+Users download the first updater-enabled version from Releases. Subsequent stable
+releases support in-app detection, verified download and an explicit restart.
+View all releases still opens the full list, including previews. Updates use the
+same per-user installer and preserve user data. See [app updates](app-updates.md)
+for version-tag publication; routine main/PR builds do not publish.

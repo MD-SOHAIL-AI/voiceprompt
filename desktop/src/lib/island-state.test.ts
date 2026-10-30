@@ -43,4 +43,6 @@ describe("island interaction priority", () => {
     ).toEqual([]));
   it("does not pretend a disconnected timer is running", () =>
     expect(islandKind(runtime, hub, false)).toBe("error"));
+  it("keeps empty recognition recoverable even without an error message", () =>
+    expect(islandKind({ ...runtime, failedAudio: true }, hub)).toBe("error"));
 });

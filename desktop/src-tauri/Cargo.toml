@@ -1,6 +1,6 @@
 [package]
 name = "voiceprompt-desktop"
-version = "0.5.1"
+version = "0.6.1"
 description = "Local voice typing and daily focus tools"
 authors = ["VoicePrompt contributors"]
 edition = "2021"
@@ -14,7 +14,7 @@ name = "VoicePrompt"
 path = "src/main.rs"
 
 [build-dependencies]
-tauri-build = { version = "2" }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "devtools"] }
@@ -23,6 +23,9 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
+minisign-verify = { path = "vendor/minisign-verify" }
+sha2 = "0.10"
+semver = "1"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Graphics_Gdi"] }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Registry", "Win32_Storage_FileSystem", "Win32_Networking_WinHttp", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Graphics_Gdi"] }

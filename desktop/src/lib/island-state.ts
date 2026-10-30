@@ -21,13 +21,9 @@ export function islandKind(
     runtime.status === "catching up"
   )
     return "recording";
-  if (
-    runtime.status === "transcribing" ||
-    runtime.status === "cleaning" ||
-    runtime.status === "starting"
-  )
+  if (runtime.status === "transcribing" || runtime.status === "starting")
     return "processing";
-  if (runtime.error) return "error";
+  if (runtime.error || runtime.failedAudio) return "error";
   if (runtime.status === "loading model") return "preparing";
   if (hub?.timer && ["running", "paused"].includes(hub.timer.status))
     return "focus";

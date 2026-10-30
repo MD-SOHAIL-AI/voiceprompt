@@ -12,6 +12,38 @@ from voiceprompt.session import AudioQueue, DictationSession, IncompleteRecordin
 
 
 class SessionTests(unittest.TestCase):
+    def test_audio_queued_between_empty_read_and_capture_done_is_drained(self):
+        session = DictationSession(1)
+        recorder = self.make_recorder(session)
+        backend = MagicMock()
+        backend.finish_session.return_value = "complete sentence"
+        stopped = threading.Event()
+        original_get = session.audio_queue.get
+        first_read = True
+
+        def delayed_empty_read(timeout=0.02):
+            nonlocal first_read
+            if first_read:
+                first_read = False
+                # Simulate an empty read that resumes just after stop delivers
+                # the release tail and publishes capture completion.
+                self.assertTrue(stopped.wait(1))
+                return None
+            return original_get(timeout)
+
+        session.audio_queue.get = delayed_empty_read
+        session.run(recorder, backend, hotwords="", noise_suppression=False,
+                    on_recording_stopped=stopped.set)
+        self.assertEqual(sum(len(c.args[0]) for c in backend.accept_audio.call_args_list), 3200)
+
+    def test_capture_starts_before_slow_recognizer_session_setup(self):
+        session = DictationSession(1)
+        recorder = self.make_recorder(session)
+        backend = MagicMock()
+        backend.begin_session.side_effect = lambda *_: self.assertTrue(recorder.start.called)
+        backend.finish_session.return_value = "all words"
+        self.assertEqual(session.run(recorder, backend, hotwords="", noise_suppression=False)[0], "all words")
+
     def test_duration_bound_handles_variable_callback_sizes(self):
         queue = AudioQueue(max_seconds=2)
         queue.put(np.ones(16000), 16000)

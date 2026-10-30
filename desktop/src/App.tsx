@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   AlarmClock,
   Bell,
@@ -15,21 +15,25 @@ import {
 import { useBackend, isNative, isPreview, native } from "./lib/backend";
 import { useApp } from "./store";
 import { pages, type Page } from "./types";
-import { Button, Modal, WaveMark } from "./components/ui";
+import { Button, Modal, WaveMark, useAction } from "./components/ui";
 import { DictationPage, Onboarding } from "./pages/Dictation";
 import { HistoryPage } from "./pages/History";
 import { TasksPage, FocusPage, AlarmsPage } from "./pages/Planner";
 import { ContestsPage } from "./pages/Contests";
 import { SettingsPage } from "./pages/Settings";
 import { NotificationList } from "./components/Notifications";
+import { UpdateShortcut } from "./components/Updates";
+import { useUpdateConnection } from "./lib/updates";
 
 const icons = [Mic, History, ListTodo, Timer, AlarmClock, Trophy, SettingsIcon];
 export default function App() {
   useBackend();
+  useUpdateConnection();
   const page = useApp((s) => s.page),
     setPage = useApp((s) => s.setPage),
     data = useApp((s) => s.data);
   const error = useApp((s) => s.error),
+    settingsRecovery = useApp((s) => s.settingsRecovery),
     connected = useApp((s) => s.connected),
     toast = useApp((s) => s.toast);
   const count = useApp((s) => s.planner?.pendingCount ?? 0);
@@ -84,6 +88,7 @@ export default function App() {
       </aside>
       <div className="titlebar" data-tauri-drag-region>
         <div data-tauri-drag-region />
+        <UpdateShortcut />
         <Button
           tone="ghost"
           aria-label={`Pending reminders${count ? `: ${count}` : ""}`}
@@ -127,6 +132,7 @@ export default function App() {
         {error && (
           <div role="alert" className="notice danger">
             <span>{error.replace(/^Error: /, "")}</span>
+            {settingsRecovery && <SettingsRecovery />}
             <Button
               onClick={() =>
                 void native("restart_engine").catch((e) =>
@@ -170,5 +176,41 @@ export default function App() {
         <NotificationList />
       </Modal>
     </div>
+  );
+}
+
+function SettingsRecovery() {
+  const [confirm, setConfirm] = useState(false);
+  const action = useAction();
+  async function recover(mode: "backup" | "defaults") {
+    if (await action.run("configuration.recover", { mode })) {
+      setConfirm(false);
+      await native("restart_engine").catch((error) =>
+        useApp.setState({ error: String(error) }),
+      );
+    }
+  }
+  return (
+    <>
+      <Button disabled={action.pending} onClick={() => void recover("backup")}>
+        Restore settings backup
+      </Button>
+      <Button disabled={action.pending} onClick={() => setConfirm(true)}>
+        Start with defaults
+      </Button>
+      <Modal
+        open={confirm}
+        onClose={() => setConfirm(false)}
+        title="Recover with default settings"
+        description="The unreadable settings file will be kept. Your history, tasks, alarms, and downloaded models remain available. Microphone setup will open again."
+      >
+        <Button
+          disabled={action.pending}
+          onClick={() => void recover("defaults")}
+        >
+          Keep original file and use defaults
+        </Button>
+      </Modal>
+    </>
   );
 }

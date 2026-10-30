@@ -2,17 +2,42 @@
 
 Local voice typing and daily focus tools for Windows 10/11 x64.
 
-Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete recording and pastes the text once. Speech recognition runs locally; optional cloud text cleanup is off by default.
+Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete recording and pastes the text once. Speech recognition and transcript processing run locally. No AI API keys are needed.
 
 ## Download and install
 
 Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
+[VoicePrompt 0.6.1 Beta 1](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.6.1-beta.1)
+is available for Windows 10/11 x64 testing. This public beta uses the tested 0.6.1
+build, which displays 0.6.1 in the app. Download it manually; beta releases are
+excluded from the stable update channel. The installer is unsigned, so Windows
+may show a publisher or SmartScreen warning. See the
+[beta notes](docs/release-notes-0.6.1-beta.1.md) for validation and limitations.
+
+The 0.6.0 release candidate adds local-only processing, bounded recovery and transport, safer clipboard handling, phrase decoding, and new recording clicks. See the [candidate notes](docs/release-notes-0.6.0.md) for verification and outstanding production gates.
+
 The 0.5.1 desktop redesign is available as an [unsigned Windows preview](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.5.1-preview.1). See the [release notes](docs/release-notes-0.5.1.md) for features, validation and remaining manual hardware checks. Models download separately on first preparation; cached models work offline. Main-branch pushes do not automatically publish releases.
+
+Windows can show **Windows protected your PC** for these unsigned installers.
+Publisher signing is not configured yet. See [Windows signing and SmartScreen](docs/windows-signing.md)
+for the verified cause, signing setup, and guidance for existing preview downloads.
 
 Uninstall from **Windows Settings → Apps → Installed apps → VoicePrompt**. The uninstaller closes the installed app and speech workers, removes installed files, shortcuts, and VoicePrompt startup entries, and keeps your settings, history, tasks, and shared model cache. A downloaded installer or a developer's source/build folders remain until you remove them yourself. The `Uninstall VoicePrompt Startup.bat` file only disables automatic startup; it does not uninstall the app.
 
 If you used the 0.4.0 uninstaller while VoicePrompt was running and files remain, install 0.4.1 into the same folder, then uninstall again. This repairs the installation record so the fixed uninstaller can remove those files.
+
+## App updates
+
+Version 0.6.1 adds **Check for updates** in Settings and an **Update now** action
+when a stable release is available. Downloads are verified before installation;
+choose **Restart to update** when ready. Existing users install the first
+updater-enabled version manually once. Saved data and cached models are preserved.
+Automatic checks can be disabled. Update signatures and GitHub release hosting
+require no paid service; Windows publisher signing remains separate.
+
+Maintainers publish updates by pushing a matching version tag after merging to
+main. See [update setup and release instructions](docs/app-updates.md).
 
 ## Voice typing
 
@@ -33,6 +58,10 @@ Recordings support five minutes, with an elapsed timer and a warning during the 
 
 Failed recognition can be retried from memory. This audio is cleared when recovered, discarded, replaced by another recording, or on exit; it is never automatically written to disk. Audio with microphone frame drops is never pasted as a complete recording. Cancel ends the session without inserting text.
 
+If recognition returns no text, the recording is also kept for **Retry recording**.
+If recording keys or modifiers remain held for two seconds after recognition, the
+text becomes available to copy and the app can accept another recording.
+
 ## What is included
 
 - Dictation, local transcript history, custom dictionary, microphone setup, tray, and a floating status indicator.
@@ -40,7 +69,7 @@ Failed recognition can be retried from memory. This audio is cleared when recove
 - Tasks with notes and reminders; activity timers of any duration; configurable Pomodoro cycles.
 - One-time and repeating alarms, dismiss/snooze reminders, and a pending-reminders inbox.
 - Codeforces, LeetCode, CodeChef, and AtCoder contest schedules. Codeforces needs no key; other platforms use your CLIST credentials through **Contests → Connect CLIST**.
-- Settings for sounds, startup, clipboard restoration, history limits, and optional OpenRouter/Gemini text cleanup.
+- Soft recording clicks with preview controls, startup preferences, clipboard restoration, and history limits.
 
 Timers and planner data work offline. Alarm delivery requires VoicePrompt to be running and Windows awake. Closing the main window keeps the tray running. Choose **Quit** from the tray or app menu to exit.
 
@@ -48,9 +77,13 @@ Timers and planner data work offline. Alarm delivery requires VoicePrompt to be 
 
 Settings, history, planner data, runtime caches, and bounded diagnostics live under `%LOCALAPPDATA%\VoicePrompt`. Existing data stays in place; configuration migration and the first desktop planner upgrade create backups. Uninstall preserves user data and cached models.
 
-Audio remains local. Enabling cloud cleanup explicitly sends completed transcript text to the selected provider. Cleanup and CLIST keys use Windows Credential Manager, separate from JSON settings and SQLite. Source launches also support the environment variables documented in `.env.example`; never include a real `.env` in a release.
+Audio and transcript processing remain local. Gemini and OpenRouter integrations and key-entry controls have been removed. Upgrading retires VoicePrompt's old provider credentials from Windows Credential Manager; a failed removal can be retried in Settings. Model preparation can download model files, and contest schedules use their existing online services. CLIST credentials remain in Windows Credential Manager, separate from settings and SQLite.
 
 History contains transcript text on this device. Set its limit to zero to disable future persistence, or use **Clear history**. Diagnostic metrics contain timestamps, duration, backlog, stop reason, engine, and outcome, without transcript text or audio. No telemetry is uploaded automatically.
+
+Automatic app update checks contact GitHub for release metadata and can be disabled
+in Settings. Installers download only when you choose Update now. Audio,
+transcripts, and diagnostic logs are not included in update requests.
 
 ## Run from source
 
@@ -74,7 +107,7 @@ The normal runtime dependencies are in `requirements.txt`. `requirements-noise.t
 - **Controller:** `main.py` owns session lifecycle, settings, insertion, and recovery. Shared states and stop reasons live in `state.py`.
 - **Audio and recognition:** `recorder.py`, `session.py`, and `backend_process.py` separate capture from potentially slow recognition. One persistent, isolated process owns the selected model.
 - **Services:** `desktop_sidecar.py` adapts the existing controller, planner, contest, history, credentials and storage services through bounded JSON lines. Both native windows use one engine.
-- **Release:** `packaging/` defines the engine and per-user installer; `scripts/build_desktop.ps1` builds and validates them. CI uploads private workflow artifacts without publishing releases.
+- **Release:** `packaging/` defines the engine and per-user installer. Routine CI tests without publishing; stable version tags use `scripts/build_update_release.py` to build and verify update-signed releases.
 
 ## Test and build
 
@@ -86,10 +119,10 @@ npm ci
 npm run test
 npm run build
 cd ..
-.\scripts\build_desktop.ps1
+.\scripts\build_desktop.ps1 -AllowUnsignedPreview
 ```
 
-The build script needs Inno Setup 6, either under `.tools\inno` or supplied with `-InnoCompiler`. Supply `-SignThumbprint` with your certificate identity and Windows SDK signtool to sign the application and installer. Outputs go to `release/`, including SHA-256 checksums. See [release instructions](docs/releasing.md) for publishing and clean-machine acceptance.
+The build script needs Inno Setup 6, either under `.tools\inno` or supplied with `-InnoCompiler`. Public release builds require `-SignThumbprint` with a trusted certificate identity; they sign and verify the desktop, speech engine, installer and uninstaller. `-AllowUnsignedPreview` explicitly builds a test installer with an `unsigned-preview` filename. Outputs include SHA-256 checksums and a signing report. See [signing setup](docs/windows-signing.md) and [release instructions](docs/releasing.md).
 
 The build self-check launches the Tauri executable and all four frozen speech workers without personal settings, microphone, hooks or model downloads. Separate WebView2 integration checks exercise the actual packaged engine using a disposable profile. These checks verify packaging and workflows; speech accuracy and physical microphone/global-key behavior require manual acceptance.
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import urllib.request
@@ -49,6 +50,8 @@ def vad_file() -> Path:
     path = config_dir() / "models" / "silero_vad.onnx"
     if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == VAD_SHA256:
         return path
+    if os.environ.get("HF_HUB_OFFLINE") == "1":
+        raise RuntimeError("The Parakeet speech detector is not cached. Prepare it while online first.")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f"silero_vad-{uuid.uuid4().hex}.tmp")
     try:

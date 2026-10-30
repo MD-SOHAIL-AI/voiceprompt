@@ -138,6 +138,20 @@ export function DictationPage() {
             </Button>
           </div>
         </div>
+        {runtime.working &&
+          (runtime.operationSeconds ?? 0) >= 5 &&
+          (runtime.status === "starting" ||
+            runtime.detail.startsWith("Cancelling")) && (
+            <Button
+              onClick={() =>
+                void native("restart_engine").catch((error) =>
+                  notify(String(error)),
+                )
+              }
+            >
+              Restart stalled audio engine
+            </Button>
+          )}
         {runtime.working && !runtime.recording && (
           <div className="preparation">
             <progress aria-label="Preparation or recognition progress" />
@@ -145,12 +159,12 @@ export function DictationPage() {
           </div>
         )}
       </div>
-      {runtime.error && (
+      {(runtime.error || runtime.failedAudio) && (
         <div className="notice danger" role="alert">
           <AlertTriangle size={18} />
           <div>
             <strong>Something needs attention</strong>
-            <p>{runtime.error}</p>
+            <p>{runtime.error || runtime.detail}</p>
           </div>
           {runtime.failedAudio && (
             <>
@@ -169,6 +183,11 @@ export function DictationPage() {
             </>
           )}
         </div>
+      )}
+      {runtime.storageWarning && (
+        <p className="notice warning" role="status">
+          {runtime.storageWarning}
+        </p>
       )}
       <div className="transcript-panel panel">
         <h2>Latest transcript</h2>
@@ -222,7 +241,7 @@ export function DictationPage() {
       <p className="page-footnote">
         {!runtime.working && !runtime.error
           ? runtime.detail
-          : "Audio stays on this device. Cloud cleanup runs only when you enable it."}
+          : "Speech and transcript processing stay on this device."}
       </p>
     </section>
   );

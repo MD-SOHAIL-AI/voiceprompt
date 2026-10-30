@@ -13,11 +13,17 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_opener::OpenerExt;
 
+mod update_core;
+mod update_http;
+mod updates;
+
 const MAX_FRAME: usize = 1024 * 1024;
 const ENGINE_STOPPED: &str = "The voice engine stopped. Restart it to continue.";
+static ENGINE_GENERATION: AtomicU64 = AtomicU64::new(1);
 type Pending = HashMap<u64, mpsc::Sender<Result<Value, String>>>;
 
 struct Engine {
+    generation: u64,
     input: Mutex<Option<ChildStdin>>,
     child: Mutex<Option<Child>>,
     pending: Mutex<Pending>,
@@ -34,7 +40,7 @@ impl Engine {
         }
         let id = self.serial.fetch_add(1, Ordering::Relaxed);
         let bytes =
-            serde_json::to_vec(&json!({"version":1,"id":id,"method":method,"params":params}))
+            serde_json::to_vec(&json!({"version":2,"id":id,"method":method,"params":params}))
                 .map_err(|_| "Invalid command.")?;
         if bytes.len() + 1 > MAX_FRAME {
             return Err("This command is too large.".into());
@@ -106,14 +112,17 @@ impl Engine {
 
     fn shutdown(&self) {
         if !self.closed.load(Ordering::Acquire) {
-            if let Ok(mut input) = self.input.lock() {
-                if let Some(stream) = input.as_mut() {
-                    let _ = stream.write_all(
-                        b"{\"version\":1,\"id\":0,\"method\":\"shutdown\",\"params\":{}}\n",
-                    );
-                    let _ = stream.flush();
+            // A stalled request writer must not prevent process containment
+            // from enforcing shutdown. Killing the child unblocks its pipe.
+            if let Ok(mut input) = self.input.try_lock() {
+                if let Some(mut stream) = input.take() {
+                    thread::spawn(move || {
+                        let _ = stream.write_all(
+                            b"{\"version\":2,\"id\":0,\"method\":\"shutdown\",\"params\":{}}\n",
+                        );
+                        let _ = stream.flush();
+                    });
                 }
-                *input = None;
             }
         }
         if let Ok(mut child) = self.child.lock() {
@@ -157,6 +166,7 @@ impl Engine {
 }
 
 struct DesktopState {
+    restart_lock: tauri::async_runtime::Mutex<()>,
     engine: Mutex<Option<Arc<Engine>>>,
     launch_error: Mutex<Option<String>>,
     quitting: AtomicBool,
@@ -283,6 +293,7 @@ fn spawn_engine(app: &AppHandle) -> Result<Arc<Engine>, String> {
         });
     }
     let engine = Arc::new(Engine {
+        generation: ENGINE_GENERATION.fetch_add(1, Ordering::Relaxed),
         input: Mutex::new(input),
         child: Mutex::new(Some(child)),
         pending: Mutex::new(HashMap::new()),
@@ -305,7 +316,7 @@ fn spawn_engine(app: &AppHandle) -> Result<Arc<Engine>, String> {
             if !matches!(result, Ok(n) if n > 0) || frame.len() > MAX_FRAME {
                 break;
             }
-            let Ok(value) = serde_json::from_slice::<Value>(&frame) else {
+            let Ok(mut value) = serde_json::from_slice::<Value>(&frame) else {
                 break;
             };
             // Keep startup failures even when the WebView has not subscribed yet.
@@ -329,11 +340,12 @@ fn spawn_engine(app: &AppHandle) -> Result<Arc<Engine>, String> {
                     let _ = sender.send(response);
                 }
             } else {
+                value["engineGeneration"] = json!(reader_engine.generation);
                 let _ = app.emit("engine-event", &value);
             }
         }
         reader_engine.disconnect();
-        let _ = app.emit("engine-disconnected", reader_engine.failure_message());
+        let _ = app.emit("engine-disconnected", json!({"generation":reader_engine.generation,"message":reader_engine.failure_message()}));
         if smoke {
             let code = reader_engine
                 .child
@@ -354,17 +366,34 @@ async fn engine_request(
     params: Value,
     state: State<'_, DesktopState>,
 ) -> Result<Value, String> {
-    if method == "shutdown" {
+    if method == "shutdown" || method.starts_with("update.") {
         return Err("Use the app's Quit action.".into());
     }
     let engine = engine(&state)?;
-    tauri::async_runtime::spawn_blocking(move || engine.request(&method, params))
-        .await
-        .map_err(|_| "The operation was interrupted.".to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut result = engine.request(&method, params)?;
+        if method == "bootstrap" {
+            result["engineGeneration"] = json!(engine.generation);
+        }
+        Ok(result)
+    })
+    .await
+    .map_err(|_| "The operation was interrupted.".to_string())?
 }
 
 #[tauri::command]
 async fn restart_engine(app: AppHandle, state: State<'_, DesktopState>) -> Result<(), String> {
+    let _restart = state.restart_lock.lock().await;
+    if app
+        .state::<updates::Updates>()
+        .installing
+        .load(Ordering::Acquire)
+    {
+        return Err("VoicePrompt is closing to install an update.".into());
+    }
+    if state.quitting.load(Ordering::Acquire) {
+        return Err("The app is closing.".into());
+    }
     let old = {
         state
             .engine
@@ -386,8 +415,9 @@ async fn restart_engine(app: AppHandle, state: State<'_, DesktopState>) -> Resul
             *failure = Some(error.clone());
         }
     })?;
+    let generation = replacement.generation;
     *state.engine.lock().map_err(|_| "Engine unavailable.")? = Some(replacement);
-    app.emit("engine-restarted", ())
+    app.emit("engine-restarted", generation)
         .map_err(|_| "Cannot reconnect the interface.".to_string())
 }
 
@@ -659,11 +689,21 @@ fn quit_app(app: AppHandle) {
 }
 
 pub fn run() {
+    if updates::helper_mode() {
+        return;
+    }
     let smoke = std::env::args().any(|arg| arg == "--smoke-test");
     let mut context = tauri::generate_context!();
     let acceptance = std::env::var_os("VOICEPROMPT_ACCEPTANCE_DIR")
         .map(std::path::PathBuf::from)
         .filter(|path| path.is_absolute());
+    if let Some(profile) = &acceptance {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        profile.hash(&mut hasher);
+        context.config_mut().identifier =
+            format!("app.voiceprompt.acceptance.a{:x}", hasher.finish());
+    }
     for window in &mut context.config_mut().app.windows {
         window.devtools = Some(false);
         if let Some(profile) = &acceptance {
@@ -682,7 +722,9 @@ pub fn run() {
         }
     }
     let mut builder = tauri::Builder::default()
+        .manage(updates::Updates::new())
         .manage(DesktopState {
+            restart_lock: tauri::async_runtime::Mutex::new(()),
             engine: Mutex::new(None),
             launch_error: Mutex::new(None),
             quitting: AtomicBool::new(false),
@@ -697,6 +739,9 @@ pub fn run() {
     }
     let app = builder
         .setup(move |app| {
+            if !smoke {
+                updates::schedule(app.handle().clone());
+            }
             if smoke {
                 if let Some(main) = app.get_webview_window("main") {
                     let _ = main.hide();
@@ -787,7 +832,13 @@ pub fn run() {
             island_status,
             restore_island,
             remember_island,
-            quit_app
+            quit_app,
+            updates::update_status,
+            updates::update_check,
+            updates::update_download,
+            updates::update_cancel,
+            updates::update_preferences,
+            updates::update_install
         ])
         .build(context)
         .expect("Cannot initialize VoicePrompt desktop");
@@ -815,6 +866,7 @@ mod tests {
 
     fn idle_engine() -> Engine {
         Engine {
+            generation: 1,
             input: Mutex::new(None),
             child: Mutex::new(None),
             pending: Mutex::new(HashMap::new()),
@@ -864,5 +916,21 @@ mod tests {
         assert!(!allowed_url("https://user:pass@codeforces.com/"));
         assert!(!allowed_url("file:///C:/Windows/System32/cmd.exe"));
         assert!(!allowed_url("https://github.com/someone/else"));
+    }
+
+    #[test]
+    fn shutdown_does_not_wait_for_a_stalled_request_writer() {
+        let engine = Arc::new(idle_engine());
+        let guard = engine.input.lock().unwrap();
+        let copy = engine.clone();
+        let (sender, receiver) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            copy.shutdown();
+            let _ = sender.send(());
+        });
+        let result = receiver.recv_timeout(Duration::from_secs(2));
+        drop(guard);
+        worker.join().unwrap();
+        assert!(result.is_ok());
     }
 }

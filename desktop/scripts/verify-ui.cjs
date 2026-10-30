@@ -108,7 +108,14 @@ async function expand(tab) {
       [vite, "--host", "127.0.0.1", "--port", "1426", "--strictPort"],
       { cwd: path.join(root, "desktop"), windowsHide: true, stdio: "ignore" },
     );
-    await until(async () => (await fetch("http://127.0.0.1:1426")).ok);
+    await until(
+      async () =>
+        (
+          await fetch("http://127.0.0.1:1426", {
+            signal: AbortSignal.timeout(5000),
+          })
+        ).ok,
+    );
     browser = await chromium.launch({
       headless: true,
       executablePath: process.env.VOICEPROMPT_BROWSER_PATH || undefined,

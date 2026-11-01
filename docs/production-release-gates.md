@@ -4,7 +4,13 @@ A passing GitHub Actions check means the automated suite, frozen worker smoke te
 installer compilation, live-uninstall checks, and packaging checks have passed on
 a CI Windows runner. It **does not** establish safe operation on user hardware.
 
-## Release blockers (all required for a stable release)
+For the update-signed distribution channel, follow [app updates](app-updates.md)
+and the mandatory checks in `release.yml`. Update authentication uses the
+existing app signing identity and does not claim Windows publisher certification.
+The checklist below records the broader hardware and publisher-signing
+acceptance work; publishing an update does not establish those manual results.
+
+## Full hardware and publisher-signing acceptance
 
 - [ ] The proposed release commit has green Windows Actions and a checksum-matched installer.
 - [ ] A clean Windows 10 x64 normal-user VM installs, launches, upgrades from 0.4.0,
@@ -42,10 +48,13 @@ Record test device/OS build, result, reproduction evidence, reviewer, date and
 artifact SHA-256 in a release-specific acceptance record. Do not place customer
 transcripts, API keys, or personal data in acceptance artifacts.
 
-**Policy:** The `windows.yml` tag job may create or repair **draft previews**.
-Stable publication requires the separately reviewed gates above and must not
-be described as automatic deployment to installed applications. The current
-Check for updates action opens GitHub Releases; it does not silently install.
+`windows.yml` publishes an unsigned beta only after an explicitly marked merge
+and passing checks. `release.yml` publishes update-signed stable packages after
+its signature, native, and installer gates. The complete hardware/publisher
+certification checklist above remains separate and must not be represented as
+completed by CI. Installed versions 0.6.1 and later can check for, download, and
+verify stable updates; installation starts when the user chooses Restart to
+update. Earlier versions open GitHub Releases and need a manual upgrade once.
 
 ## CI coverage vs manual coverage
 
@@ -61,5 +70,6 @@ model accuracy, independent legal/security review and publisher signing.
 ## Versioning
 
 Do not retag or overwrite published releases. Preview identifiers use
-`vMAJOR.MINOR.PATCH-preview.N`. Stable tags use `vMAJOR.MINOR.PATCH` only
-after the evidence above is attached to the approved release.
+`vMAJOR.MINOR.PATCH-preview.N` or `vMAJOR.MINOR.PATCH-beta.N`. Stable-channel
+tags use `vMAJOR.MINOR.PATCH` and the update-signed release workflow. Release
+notes must distinguish automated verification from outstanding manual checks.

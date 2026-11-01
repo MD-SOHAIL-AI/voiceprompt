@@ -51,7 +51,7 @@ tag-release build step; they are not passed to PR tests or artifacts.
    desktop package/lockfile, Cargo/lockfile, and Tauri versions. Run
    `python scripts/verify_versions.py`.
 2. Add `docs/release-notes-VERSION.md`, run checks, and merge into main.
-3. Push the matching stable version tag, such as `v0.6.1`.
+3. Push the matching stable version tag, such as `v0.6.3`.
 
 `.github/workflows/release.yml` verifies tag/main ancestry, runs regressions,
 builds the complete app, signs metadata, verifies it using the packaged native
@@ -63,7 +63,7 @@ repair a faulty release with a higher version.
 For an explicit local update-signed release:
 
 ```powershell
-python scripts/build_update_release.py --notes docs/release-notes-0.6.1.md
+python scripts/build_update_release.py --notes docs/release-notes-0.6.3.md
 ```
 
 The driver uses the established builder's unsigned packaging checks, then builds
@@ -73,6 +73,11 @@ verified local stage and is never used by CI.
 
 Existing users need one manual installation of this first updater-enabled build.
 Subsequent stable releases support the complete in-app flow.
+
+Version 0.6.3 is newer than both recent betas and uses the existing signing
+identity. Installed 0.6.1 and 0.6.2 apps can therefore discover and authenticate
+it. Beta releases stay outside this feed. Versions older than 0.6.1 still need
+one manual installation because they do not contain the updater.
 
 ## Verification, data and recovery
 

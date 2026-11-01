@@ -8,12 +8,13 @@ Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete reco
 
 Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
-[VoicePrompt 0.6.2 Beta 1](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.6.2-beta.1)
-fixes the unwanted minimize/close title bar showing through the floating island.
-The app displays 0.6.2. Download the Windows 10/11 x64 installer manually; beta
-releases are excluded from the stable update channel. The installer is unsigned,
-so Windows may show a publisher or SmartScreen warning. See the
-[beta notes](docs/release-notes-0.6.2-beta.1.md) for installation and limitations.
+[VoicePrompt 0.6.3](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.6.3)
+delivers the floating island fix through the signed in-app update channel.
+On installed versions 0.6.1 or later, open **Settings → Check for updates**, choose
+**Update now**, then **Restart to update**. Older versions need one manual
+installation. Saved data and model caches are preserved. Update signatures are
+verified by the app; Windows publisher signing remains separate. See the
+[release notes](docs/release-notes-0.6.3.md) for installation and validation limits.
 
 The 0.6.0 release candidate adds local-only processing, bounded recovery and transport, safer clipboard handling, phrase decoding, and new recording clicks. See the [candidate notes](docs/release-notes-0.6.0.md) for verification and outstanding production gates.
 

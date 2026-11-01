@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+import json
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -26,35 +27,32 @@ class HeadlessPresentation:
     def show_page(self, name): self.on_navigation(name)
 
 
-def validate_settings(settings, updates):
-    if set(updates) - set(asdict(settings)):
-        raise ValueError("Unsupported setting.")
-    result = replace(settings, **updates)
-    for name, default in asdict(settings).items():
-        value = getattr(result, name)
-        if isinstance(default, bool) and not isinstance(value, bool):
-            raise ValueError(f"{name} must be enabled or disabled.")
-        if isinstance(default, str) and (not isinstance(value, str) or len(value) > 512):
-            raise ValueError(f"Invalid value for {name}.")
-    for name, choices in {"backend": {"whisper", "moonshine", "parakeet", "nemotron"},
-                          "cleanup_provider": {"none", "gemini", "openrouter"},
-                          "hotkey": {"right_ctrl", "left_ctrl", "right_alt", "left_alt", "f8", "f9"},
-                          "capture_mode": {"auto", "wasapi", "mme"}, "recording_mode": {"ptt", "toggle"},
-                          "nemotron_device": {"cpu", "vulkan"}, "streaming_model": {"tiny", "small"},
-                          "device": {"cpu", "cuda", "auto"}, "compute_type": {"int8", "float16", "float32", "int8_float16", "auto"}}.items():
-        if getattr(result, name) not in choices:
-            raise ValueError(f"Choose a supported {name.replace('_', ' ')}.")
-    for name, low, high in (("cpu_threads", 1, 12), ("beam_size", 1, 10), ("max_history", 0, 500)):
-        value = getattr(result, name)
-        if type(value) is not int or not low <= value <= high:
-            raise ValueError(f"{name.replace('_', ' ')} must be {low}–{high}.")
-    timeout = result.cleanup_timeout_seconds
-    if not isinstance(timeout, (float, int)) or isinstance(timeout, bool) or not math.isfinite(timeout) or not 1 <= timeout <= 15:
-        raise ValueError("Cleanup timeout must be 1–15 seconds.")
-    if not isinstance(result.replacements, dict) or len(result.replacements) > 500:
-        raise ValueError("Use at most 500 dictionary entries.")
-    if any(not isinstance(k, str) or not isinstance(v, str) or not k.strip() or not v.strip() or max(len(k), len(v)) > 240 for k, v in result.replacements.items()):
-        raise ValueError("Dictionary entries need a source and replacement of at most 240 characters.")
+from voiceprompt.config import validate_settings
+
+
+def ordered_items(kind, items):
+    if kind in {"notification", "history"}:
+        return items
+    field = {"alarm": "due", "contest": "start"}.get(kind)
+    return sorted(items, key=lambda item: ((item.get(field) or 0) if field else 0, item["id"]))
+
+
+def wire_page(kind, items, offset=0, limit=50):
+    """Keep snapshots small; full task notes are fetched only when editing."""
+    result, size = [], 0
+    for item in ordered_items(kind, items)[offset:offset + limit]:
+        row = dict(item)
+        truncated = False
+        for key, value in row.items():
+            if isinstance(value, str) and key not in {"id", "url", "owner"}:
+                row[key] = value[:240 if key == "notes" else 1024]
+                if key == "text" and row[key] != value: truncated = True
+        if truncated: row["truncated"] = True
+        encoded = len(json.dumps(row, ensure_ascii=False).encode("utf-8"))
+        if result and size + encoded > 96000:
+            break
+        result.append(row)
+        size += encoded
     return result
 
 
@@ -64,12 +62,25 @@ class DesktopService:
         self.stop = threading.Event()
         self.app.pill.on_navigation = lambda page: writer.event("navigate", {"page": page})
 
+    def emit(self, name, payload):
+        try:
+            self.writer.event(name, payload)
+        except ValueError:
+            self.writer.event("protocol-error", {"message": "A desktop update exceeded its size limit. Open a smaller page; voice typing is still available."})
+
     def runtime(self):
         app = self.app
         with app._control:
             return {"status": app.get_status(), "ready": app._ready, "working": app._working,
                     "sessionId": app._current_id, "elapsedSeconds": app.elapsed_seconds,
+                    "operationSeconds": max(0, time.perf_counter() - app._work_started_at) if app._working else 0,
+                    "recognitionPhase": app._session.phase if app._session else "",
+                    "processingSeconds": max(0, time.perf_counter() - app._session.released_at) if app._session and app._session.released_at else 0,
                     "backlogSeconds": app.backlog_seconds, "latestText": app.latest_text,
+                    "storageWarning": getattr(app, "storage_warning", ""),
+                    "credentialWarning": getattr(app, "credential_warning", ""),
+                    "desiredSettingsRevision": getattr(app, "_settings_revision", 0),
+                    "appliedSettingsRevision": getattr(app, "_applied_settings_revision", 0),
                     "error": app.last_error, "detail": app.detail, "failedAudio": bool(app._failed_audio),
                     "recording": bool(app.recorder.is_recording), "insertionStatus": getattr(app, "insertion_status", "none"),
                     "deferReminders": bool(app._reminder_audio_busy()),
@@ -100,26 +111,31 @@ class DesktopService:
             item["kind"] = owner.split(":", 1)[0] or "summary"
             item["contest"] = contests.get(owner.removeprefix("contest:")) if item["kind"] == "contest" else None
             notices.append(item)
-        data["notifications"] = notices
+        data["notifications"] = wire_page("notification", notices)
         data["pendingCount"] = len(pending)
         data["now"] = now
         data["nextAlarm"] = min((a for a in data["alarms"] if a["enabled"] and a["due"] > now), key=lambda a: a["due"], default=None)
         data["counts"] = {kind: len(data[kind]) for kind in ("tasks", "alarms", "contests")}
         for kind in ("tasks", "alarms", "contests"):
-            if kind != "tasks":
-                data[kind].sort(key=lambda item: item.get("due", item.get("start", 0)))
-            data[kind] = data[kind][:50]
+            data[kind] = wire_page(kind.removesuffix("s"), data[kind])
         return data
 
     def dispatch(self, method, params):
         app = self.app
+        if method == "update.prepare":
+            app.prepare_update()
+            return {"ok": True}
+        if method == "update.cancel":
+            app.cancel_update()
+            return {"ok": True}
+        if getattr(app, "_updating", False) and method not in {"runtime", "shutdown", "bootstrap"}:
+            raise ValueError("VoicePrompt is closing to install an update.")
         if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") and method in {"prepare", "microphone.check", "record.start", "record.retry"}:
             raise ValueError("Microphone capture and speech preparation are disabled in an isolated verification profile.")
         if method == "bootstrap":
-            from voiceprompt.config import gemini_api_key, openrouter_api_key
-            return {"version": PROTOCOL_VERSION, "settings": asdict(app.settings), "runtime": self.runtime(),
-                    "planner": self.planner_snapshot(), "history": [asdict(item) for item in app.history.load()[:20]],
-                    "credentials": {"gemini": bool(gemini_api_key()), "openrouter": bool(openrouter_api_key())}}
+            sequence = self.writer.sequence
+            return {"version": PROTOCOL_VERSION, "snapshotSequence": sequence, "settings": asdict(app.settings), "runtime": self.runtime(),
+                    "planner": self.planner_snapshot(), "history": []}
         if method == "runtime": return self.runtime()
         if method == "prepare": app.preload_model()
         elif method == "microphone.check": app.check_microphone()
@@ -135,20 +151,36 @@ class DesktopService:
         elif method == "record.retry": app.retry_failed()
         elif method == "record.discard": app.discard_failed()
         elif method == "settings.save":
-            settings = validate_settings(app.settings, params.get("settings", {}))
-            if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") and settings.startup_on_boot:
-                raise ValueError("Windows startup cannot be changed from an isolated verification profile.")
-            app.update_settings(settings)
-            return {"queued": True}
+            with app._control:
+                settings = validate_settings(getattr(app, "_desired_settings", None) or getattr(app, "_pending_settings", None) or app.settings, params.get("settings", {}))
+                if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") and settings.startup_on_boot:
+                    raise ValueError("Windows startup cannot be changed from an isolated verification profile.")
+                revision = app.update_settings(settings)
+            return {"queued": True, "revision": revision}
+        elif method == "sound.preview":
+            if app._working: raise ValueError("Finish recording before previewing a sound.")
+            if params.get("cue") not in {"start", "stop"}: raise ValueError("Choose a recording sound.")
+            app.sounds.play(params["cue"])
+        elif method == "privacy.retire_credentials":
+            from voiceprompt.credentials import retire_cloud_credentials
+            app.credential_warning = retire_cloud_credentials()
+            return {"ok": not bool(app.credential_warning)}
         elif method == "history.list":
             query = str(params.get("query", "")).casefold()
             offset, limit = max(0, int(params.get("offset", 0))), min(50, max(1, int(params.get("limit", 20))))
             with app._control:
                 items = [asdict(item) for item in app.history.load() if query in item.text.casefold()]
-            return {"items": items[offset:offset + limit], "total": len(items)}
+            page = wire_page("history", items, offset, limit)
+            return {"items": page, "total": len(items), "nextOffset": offset + len(page)}
+        elif method == "history.item":
+            with app._control:
+                item = next((item for item in app.history.load() if item.id == params.get("id")), None)
+            if item is None: raise ValueError("This transcript was removed. Refresh history.")
+            return asdict(item)
         elif method in {"history.clear", "history.delete"}:
             with app._control:
                 app.history.clear() if method.endswith("clear") else app.history.delete(str(params["id"]))
+                app.storage_warning = ""
         elif method == "clipboard.copy":
             import pyperclip
             text = params.get("text", app.latest_text)
@@ -157,16 +189,6 @@ class DesktopService:
             with app._control:
                 app.injector.cancel_restore()
                 pyperclip.copy(text)
-        elif method == "credential.save":
-            if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"): raise ValueError("Provider credentials cannot be changed from an isolated verification profile.")
-            from voiceprompt.credentials import save_key
-            value = str(params.get("key", "")).strip()
-            if not value or len(value) > 4096: raise ValueError("Enter a valid provider key.")
-            save_key(str(params.get("provider")), value)
-        elif method == "credential.remove":
-            if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"): raise ValueError("Provider credentials cannot be changed from an isolated verification profile.")
-            from voiceprompt.credentials import remove_key
-            remove_key(str(params.get("provider")))
         elif method == "island.position": app.update_pill_position(int(params["x"]), int(params["y"]))
         elif method == "shutdown":
             self.stop.set()
@@ -185,7 +207,13 @@ class DesktopService:
             if kind not in {"task", "alarm", "contest"}: raise ValueError("Unsupported list.")
             items = planner.store.all(kind)
             offset = max(0, int(p.get("offset", 0)))
-            return {"items": items[offset:offset + 50], "total": len(items)}
+            page = wire_page(kind, items, offset)
+            return {"items": page, "total": len(items), "nextOffset": offset + len(page)}
+        if method == "item":
+            if p.get("kind") != "task": raise ValueError("Unsupported item type.")
+            item = planner.store.get("task", str(p["id"]))
+            if item is None: raise ValueError("This task was removed. Refresh the list.")
+            return item
         from voiceprompt.planner import local_timestamp
         if method == "task.save":
             due = local_timestamp(str(p["localDue"]), planner.preferences()["timezone"]) if p.get("localDue") else p.get("due")
@@ -223,25 +251,34 @@ class DesktopService:
 
     def pump(self):
         last_state = last_planner = last_settings = None
-        planner_at = 0.0
+        planner_at = runtime_at = 0.0
         try:
             while not self.stop.wait(1 / 30) and not self.app._quitting:
-                state = self.runtime()
-                if state != last_state:
-                    self.writer.event("runtime", state)
-                    last_state = state
-                if state["recording"]:
-                    self.writer.event("meter", {"sessionId": state["sessionId"], "values": self.app.recorder.envelope()})
+                if self.app.shutdown_requested():
+                    self.app.quit()
+                    self.stop.set()
+                    break
                 now = time.monotonic()
+                if now - runtime_at >= .1:
+                    runtime_at = now
+                    state = self.runtime()
+                    if state != last_state:
+                        update = dict(state)
+                        if last_state and state["latestText"] == last_state["latestText"]:
+                            update.pop("latestText")
+                        self.emit("runtime", update)
+                        last_state = state
+                if self.app.recorder.is_recording:
+                    self.emit("meter", {"sessionId": self.app._current_id, "values": self.app.recorder.envelope()})
                 if now - planner_at >= 0.5:
                     planner_at = now
                     settings = asdict(self.app.settings)
                     if settings != last_settings:
-                        self.writer.event("settings", settings)
+                        self.emit("settings", settings)
                         last_settings = settings
                     snapshot = self.planner_snapshot()
                     if snapshot != last_planner:
-                        self.writer.event("planner", snapshot)
+                        self.emit("planner", snapshot)
                         last_planner = snapshot
                     planner = self.app.planner
                     if snapshot is not None and planner and not self.app._reminder_audio_busy() and planner.claim_reminder_sound():
@@ -273,7 +310,29 @@ def main():
         if instance.already_running:
             writer.event("fatal", {"message": "Another VoicePrompt instance is running. Quit it from the system tray, then select Restart engine."})
             return 1
+        from voiceprompt.config import load_settings, recover_settings
+        try:
+            load_settings()
+        except (ValueError, OSError):
+            writer.event("fatal", {"code": "settings_recovery", "message": "Settings could not be loaded. Restore a settings backup or start with defaults. Your original files will be kept."})
+            for command, error in read_messages(sys.stdin.buffer):
+                if error: continue
+                try:
+                    if command["method"] != "configuration.recover":
+                        raise ValueError("Settings need recovery. Use the recovery controls before restarting the engine.")
+                    mode = command.get("params", {}).get("mode")
+                    if mode not in {"backup", "defaults"}: raise ValueError("Choose backup or defaults.")
+                    recover_settings(use_backup=mode == "backup")
+                    writer.send({"id": command["id"], "ok": True, "result": {"ok": True}})
+                    return 0
+                except Exception as exc:
+                    message = str(exc) if isinstance(exc, ValueError) else "Settings could not be recovered. Check disk space and folder permissions."
+                    writer.send({"id": command["id"], "ok": False, "error": {"message": message}})
+            return 1
         app = VoicePromptApp(preload_model=False, presentation=(HeadlessPresentation, HeadlessPresentation))
+        from voiceprompt.instance import ShutdownRequest
+        shutdown_request = ShutdownRequest()
+        app.shutdown_requested = shutdown_request.requested
         service = DesktopService(app, writer)
         if not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"): app.hotkey.start()
         if app.planner: app.planner.start()
@@ -299,6 +358,7 @@ def main():
             service.stop.set()
             if not app._quitting: app.quit()
             worker.join(timeout=2)
+            shutdown_request.close()
     return 0
 
 

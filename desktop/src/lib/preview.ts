@@ -3,7 +3,7 @@ import type { Bootstrap, HubSnapshot, Notice, Settings, Timer } from "../types";
 const now = () => Date.now() / 1000;
 const id = () => crypto.randomUUID();
 const settings: Settings = {
-  config_version: 6,
+  config_version: 7,
   onboarding_completed: true,
   backend: "whisper",
   nemotron_device: "vulkan",
@@ -21,13 +21,9 @@ const settings: Settings = {
   preload_model: true,
   paste_injection: true,
   preserve_clipboard: true,
-  cleanup_provider: "none",
-  cleanup_timeout_seconds: 4,
-  openrouter_model: "openrouter/free",
-  gemini_cleanup: false,
-  gemini_model: "gemini-2.5-flash-lite",
   startup_on_boot: false,
   vad_filter: true,
+  whisper_phrase_decoding: false,
   max_history: 50,
   recording_mode: "ptt",
   sound_feedback: true,
@@ -89,7 +85,7 @@ let planner: HubSnapshot = {
   counts: { tasks: 1, alarms: 1, contests: 1 },
 };
 const value: Bootstrap = {
-  version: 1,
+  version: 2,
   settings,
   runtime: {
     status: "ready",
@@ -120,7 +116,6 @@ const value: Bootstrap = {
       source: "whisper",
     },
   ],
-  credentials: { gemini: false, openrouter: false },
 };
 const state = new URLSearchParams(location.search).get("state");
 if (state === "recording") {
@@ -244,7 +239,9 @@ export async function previewRequest(
       h.text.toLowerCase().includes(String(p.query ?? "").toLowerCase()),
     );
     return { items, total: items.length };
-  } else if (method === "history.clear") value.history = [];
+  } else if (method === "history.item")
+    return value.history.find((item) => item.id === p.id);
+  else if (method === "history.clear") value.history = [];
   else if (method === "history.delete")
     value.history = value.history.filter((h) => h.id !== p.id);
   else if (method === "planner.task.save") {
@@ -334,12 +331,12 @@ export async function previewRequest(
   else if (method === "planner.contests.mute") {
     const contest = planner.contests.find((c) => c.id === p.id);
     if (contest) contest.muted = !contest.muted;
+  } else if (method === "planner.item") {
+    return planner.tasks.find((item) => item.id === p.id);
   } else if (method === "planner.page") {
     const key = `${p.kind}s` as "tasks" | "alarms" | "contests";
     return { items: planner[key], total: planner[key].length };
-  } else if (method === "credential.save" || method === "credential.remove")
-    throw new Error("Credentials are saved only in the desktop app.");
-  else if (method === "clipboard.copy")
+  } else if (method === "clipboard.copy")
     await navigator.clipboard.writeText(
       String(p.text ?? value.runtime.latestText),
     );

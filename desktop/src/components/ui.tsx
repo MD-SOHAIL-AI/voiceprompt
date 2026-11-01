@@ -36,18 +36,27 @@ export function Field({
 }
 export function Toggle({
   label,
+  hint,
   checked,
   onChange,
   disabled = false,
 }: {
   label: string;
+  hint?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
 }) {
   return (
     <label className="toggle-row">
-      <span>{label}</span>
+      <span>
+        {label}
+        {hint && (
+          <small className="muted" style={{ display: "block" }}>
+            {hint}
+          </small>
+        )}
+      </span>
       <input
         className="switch"
         type="checkbox"

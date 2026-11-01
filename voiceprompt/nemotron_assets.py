@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import json
 import shutil
 import sys
@@ -67,6 +68,8 @@ def runtime_directory() -> Path:
     destination = root / RUNTIME_NAME
     if runtime_files_valid(destination / "bin", hashes):
         return destination / "bin"
+    if os.environ.get("HF_HUB_OFFLINE") == "1":
+        raise RuntimeError("The Nemotron runtime is not cached or failed verification. Prepare it while online first.")
 
     root.mkdir(parents=True, exist_ok=True)
     archive_path = root / f"{RUNTIME_NAME}.zip"

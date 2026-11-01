@@ -10,7 +10,6 @@ class SessionState(str, Enum):
     LISTENING = "recording"
     CATCHING_UP = "catching up"
     FINISHING = "transcribing"
-    CLEANING = "cleaning"
     ERROR = "error"
 
 

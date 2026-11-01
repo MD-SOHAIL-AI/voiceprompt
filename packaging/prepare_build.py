@@ -20,6 +20,10 @@ native_icons.mkdir(parents=True, exist_ok=True)
 shutil.copy2(BUILD / 'VoicePrompt.ico', native_icons / 'icon.ico')
 
 licenses = BUILD / "licenses"
+if licenses.resolve().parent != BUILD.resolve() or licenses.name != "licenses":
+    raise RuntimeError("Unexpected license staging directory")
+if licenses.exists():
+    shutil.rmtree(licenses)
 licenses.mkdir(exist_ok=True)
 inventory = []
 for distribution in metadata.distributions():

@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import { pages } from "../types";
 import { notify, useApp } from "../store";
+import { EngineClock } from "./engine-clock";
 
 export const isNative = () => "__TAURI_INTERNALS__" in window;
 export const isPreview = () =>
@@ -57,7 +58,7 @@ export async function native(
 export async function openLink(url: string) {
   if (isNative()) await invoke("open_link", { url });
   else if (isPreview())
-    notify("Preview: the desktop app opens this contest in your browser.");
+    notify("Preview: the desktop app opens this link in your browser.");
 }
 export function navigate(page: Page) {
   useApp.getState().setPage(page);
@@ -65,8 +66,8 @@ export function navigate(page: Page) {
 
 export function useBackend() {
   useEffect(() => {
-    let closed = false,
-      serial = 0;
+    let closed = false;
+    const clock = new EngineClock();
     const disposals: (() => void)[] = [];
     const add = async (event: string, callback: (payload: unknown) => void) => {
       const dispose = await listen(event, ({ payload }) => {
@@ -81,8 +82,26 @@ export function useBackend() {
       for (let attempt = 0; !closed && generation === hydration; attempt++) {
         try {
           const value = await request<Bootstrap>("bootstrap");
-          if (!closed && generation === hydration)
-            useApp.getState().hydrate(value);
+          if (
+            !closed &&
+            generation === hydration &&
+            clock.accept(value.engineGeneration ?? 0)
+          ) {
+            const current = useApp.getState();
+            const sequence = value.snapshotSequence ?? 0;
+            current.hydrate({
+              ...value,
+              runtime: clock.newerThan("runtime", sequence)
+                ? (current.runtime ?? value.runtime)
+                : value.runtime,
+              planner: clock.newerThan("planner", sequence)
+                ? current.planner
+                : value.planner,
+              settings: clock.newerThan("settings", sequence)
+                ? (current.settings ?? value.settings)
+                : value.settings,
+            });
+          }
           return;
         } catch (error) {
           if (
@@ -93,7 +112,13 @@ export function useBackend() {
             continue;
           }
           if (!closed && generation === hydration)
-            useApp.setState({ error: String(error), connected: false });
+            useApp.setState({
+              error: String(error),
+              connected: false,
+              settingsRecovery: String(error).includes(
+                "Settings need recovery",
+              ),
+            });
           return;
         }
       }
@@ -102,10 +127,14 @@ export function useBackend() {
       if (isNative()) {
         await add("engine-event", (payload) => {
           const event = payload as EngineEvent;
-          if (event.sequence <= serial) return;
-          serial = event.sequence;
+          if (
+            !clock.accept(event.engineGeneration, event.sequence, event.event)
+          )
+            return;
           if (event.event === "runtime")
-            useApp.setState({ runtime: event.payload as Runtime });
+            useApp.setState((state) => ({
+              runtime: { ...state.runtime, ...(event.payload as Runtime) },
+            }));
           if (event.event === "planner")
             useApp.setState({ planner: event.payload as HubSnapshot });
           if (event.event === "settings")
@@ -122,21 +151,28 @@ export function useBackend() {
             const page = (event.payload as { page: Page }).page;
             if (pages.includes(page)) navigate(page);
           }
+          if (event.event === "protocol-error")
+            notify((event.payload as { message: string }).message);
           if (event.event === "fatal")
             useApp.setState({
               error: (event.payload as { message: string }).message,
               connected: false,
+              settingsRecovery:
+                (event.payload as { code?: string }).code ===
+                "settings_recovery",
             });
         });
-        await add("engine-disconnected", (message) =>
+        await add("engine-disconnected", (payload) => {
+          const value = payload as { generation: number; message: string };
+          if (!clock.accept(value.generation)) return;
           useApp.setState({
-            error: String(message),
+            error: value.message,
             connected: false,
             meter: Array(32).fill(0),
-          }),
-        );
-        await add("engine-restarted", () => {
-          serial = 0;
+          });
+        });
+        await add("engine-restarted", (generation) => {
+          if (!clock.accept(Number(generation))) return;
           void hydrate();
         });
         await add("navigate", (value) => {
@@ -152,12 +188,13 @@ export function useBackend() {
           void Promise.all([
             request<HubSnapshot>("planner.snapshot"),
             request<Runtime>("runtime"),
-          ]).then(([planner, runtime]) => {
+            request<Bootstrap>("bootstrap"),
+          ]).then(([planner, runtime, data]) => {
             if (!closed)
               useApp.setState({
                 planner,
                 runtime,
-                settings: useApp.getState().data!.settings,
+                settings: data.settings,
               });
           });
         }, 500);

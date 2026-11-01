@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import threading
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 MAX_MESSAGE_BYTES = 1024 * 1024
 
 

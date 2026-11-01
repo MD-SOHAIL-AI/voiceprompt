@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useUnsavedChanges } from "../lib/updates";
 import {
   Check,
   Edit3,
@@ -24,9 +25,16 @@ import {
 } from "../components/ui";
 
 export function usePaged<T>(kind: string, initial: T[], total: number) {
-  const [offset, setOffset] = useState(0),
-    [items, setItems] = useState<T[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [previous, setPrevious] = useState<number[]>([]);
+  const [items, setItems] = useState<T[]>([]);
   const revision = useApp((s) => s.mutation);
+  useEffect(() => {
+    if (offset >= total && offset) {
+      setOffset(0);
+      setPrevious([]);
+    }
+  }, [offset, total]);
   useEffect(() => {
     let alive = true;
     if (offset)
@@ -39,23 +47,32 @@ export function usePaged<T>(kind: string, initial: T[], total: number) {
       alive = false;
     };
   }, [kind, offset, total, revision]);
+  const visible = offset ? items : initial;
   return {
-    items: offset ? items : initial,
+    items: visible,
     footer:
-      total > 50 ? (
+      offset || total > visible.length ? (
         <div className="pagination">
           <Button
             disabled={!offset}
-            onClick={() => setOffset(Math.max(0, offset - 50))}
+            onClick={() => {
+              setOffset(previous.at(-1) ?? 0);
+              setPrevious(previous.slice(0, -1));
+            }}
           >
             Previous
           </Button>
           <span>
-            {offset + 1}–{Math.min(offset + 50, total)} of {total}
+            {total ? offset + 1 : 0}–{Math.min(offset + visible.length, total)}{" "}
+            of {total}
           </span>
           <Button
-            disabled={offset + 50 >= total}
-            onClick={() => setOffset(offset + 50)}
+            disabled={!visible.length || offset + visible.length >= total}
+            onClick={() => {
+              setPrevious([...previous, offset]);
+              setOffset(offset + visible.length);
+              setItems([]);
+            }}
           >
             Next
           </Button>
@@ -70,6 +87,7 @@ export function TasksPage() {
   const [quick, setQuick] = useState(""),
     [editing, setEditing] = useState<Task | "new" | null>(null),
     [removing, setRemoving] = useState<Task | null>(null);
+  useUnsavedChanges(Boolean(quick.trim()), "task entry");
   const paged = usePaged<Task>(
     "task",
     planner?.tasks ?? [],
@@ -165,7 +183,13 @@ export function TasksPage() {
                     <Button
                       tone="ghost"
                       aria-label={`Edit ${task.title}`}
-                      onClick={() => setEditing(task)}
+                      onClick={async () => {
+                        const detail = await action.run<Task>("planner.item", {
+                          kind: "task",
+                          id: task.id,
+                        });
+                        if (detail) setEditing(detail);
+                      }}
                     >
                       <Edit3 size={16} />
                     </Button>
@@ -368,6 +392,16 @@ export function TimerComposer({ compact = false }: { compact?: boolean }) {
     [replacement, setReplacement] = useState<Record<string, unknown> | null>(
       null,
     );
+  const timerDraft = JSON.stringify({
+    title,
+    minutes,
+    mode,
+    shortBreak,
+    longBreak,
+    rounds,
+  });
+  const [savedTimerDraft, setSavedTimerDraft] = useState(timerDraft);
+  useUnsavedChanges(timerDraft !== savedTimerDraft, "focus timer changes");
   useEffect(() => {
     if (focusTask) setTitle(focusTask.title);
   }, [focusTask]);
@@ -389,6 +423,7 @@ export function TimerComposer({ compact = false }: { compact?: boolean }) {
     }
     if (await action.run("planner.timer.start", params)) {
       notify("Focus session started.");
+      setSavedTimerDraft(timerDraft);
       useApp.setState({ focusTask: null });
     }
   }

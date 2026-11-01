@@ -29,11 +29,14 @@ a CI Windows runner. It **does not** establish safe operation on user hardware.
       are evaluated.
 - [ ] The EXE and installer are Authenticode signed with an authorized, trusted
       publisher identity, timestamped, and signatures are verified after packaging.
+      The speech engine and embedded uninstaller have the same signing identity.
+      Attach the final `.signing.json` audit and verify installed executable
+      signatures with `check_installer.ps1` on a clean account.
 - [ ] A rollback installer and customer recovery instructions are available.
 - [ ] The final SHA-256 checksum is independently verified on the exact published
       EXE bytes and GitHub release assets are checked after upload.
 - [ ] Release notes accurately explain Windows support, voice-data privacy,
-      cloud cleanup opt-in, signing status, and manual-update instructions.
+      local-only AI processing, signing status, and manual-update instructions.
 
 Record test device/OS build, result, reproduction evidence, reviewer, date and
 artifact SHA-256 in a release-specific acceptance record. Do not place customer

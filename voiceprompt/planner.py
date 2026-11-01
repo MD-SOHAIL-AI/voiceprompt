@@ -143,6 +143,8 @@ class PlannerService:
         return title.strip()[:240]
 
     def save_task(self, title: str, notes: str = "", due: float | None = None, item_id: str | None = None) -> str:
+        if due is not None and (type(due) not in {int, float} or not math.isfinite(due)):
+            raise ValueError("Choose a valid task reminder time.")
         with self.store.transaction():
             old = self.store.get("task", item_id or "") or {}
             task = {"id": item_id or uuid.uuid4().hex, "title": self._title(title), "notes": notes[:10000],
@@ -227,6 +229,8 @@ class PlannerService:
     def save_alarm(self, title: str, due: float, weekdays: list[int] | None = None, item_id=None, *, enabled: bool | None = None) -> str:
         if not math.isfinite(due) or due <= self.now():
             raise ValueError("Choose an alarm time in the future.")
+        if weekdays is not None and (not isinstance(weekdays, list) or any(type(day) is not int for day in weekdays)):
+            raise ValueError("Choose valid weekdays.")
         weekdays = sorted(set(weekdays or []))
         if any(day not in range(7) for day in weekdays):
             raise ValueError("Choose valid weekdays.")

@@ -7,7 +7,10 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    watch: { ignored: ["**/src-tauri/**"] },
   },
+  // Rust output can contain generated HTML; it is not a frontend entry point.
+  optimizeDeps: { entries: ["index.html"] },
   envPrefix: ["VITE_", "TAURI_"],
   build: {
     target: ["es2021", "chrome100"],

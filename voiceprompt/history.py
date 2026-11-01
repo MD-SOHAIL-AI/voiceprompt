@@ -27,7 +27,7 @@ class TranscriptionHistory:
 
     def add(self, text: str, duration_seconds: float = 0.0, source: str = "local") -> None:
         text = text.strip()
-        if not text:
+        if not text or self.limit <= 0:
             return
         items = self.load()
         items.insert(
@@ -46,6 +46,11 @@ class TranscriptionHistory:
         temporary.replace(self.path)
 
     def clear(self):
+        try:
+            self.load()
+        except (OSError, ValueError):
+            import shutil
+            shutil.copy2(self.path, self.path.with_name("history.unreadable." + uuid.uuid4().hex + ".json"))
         self._write([])
 
     def _write(self, items):
@@ -65,11 +70,11 @@ class TranscriptionHistory:
             return []
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return []
+        except json.JSONDecodeError as exc:
+            raise ValueError("History could not be read. The original file has been kept; Clear history can start a fresh list.") from exc
         
         if not isinstance(data, list):
-            return []
+            raise ValueError("History has an unsupported format. The original file has been kept.")
         loaded_items = []
         for index, item in enumerate(data):
             if not isinstance(item, dict) or not str(item.get("text", "")).strip():

@@ -14,7 +14,7 @@ def make_controller(directory, *, onboarding=False):
         settings=Settings(onboarding_completed=not onboarding), status="ready", detail="Hold Right Ctrl to dictate into another application.",
         latest_text="", last_error="", elapsed_seconds=0.0, backlog_seconds=0.0,
         download_progress={}, _failed_audio=None, _ready=True, _working=False,
-        _session=None, _quitting=False, _planner_error="", _pending_settings=None,
+        _session=None, _quitting=False, _updating=False, _planner_error="", _pending_settings=None,
         recorder=SimpleNamespace(level=0.0, is_recording=False),
         history=TranscriptionHistory(directory / "history.json"),
         planner=PlannerService(directory / "planner.sqlite3"), injector=Mock(),

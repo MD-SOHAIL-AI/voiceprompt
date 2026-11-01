@@ -1,0 +1,18 @@
+[package]
+name = "minisign-verify"
+version = "0.3.0"
+authors = ["Frank Denis <github@pureftpd.org>"]
+description = "Minisign signature verification for files and streams with Ed25519. A small Rust library with no external dependencies."
+readme = "README.md"
+keywords = ["minisign", "ed25519", "signatures", "verification", "streaming"]
+license = "MIT"
+homepage = "https://github.com/jedisct1/rust-minisign-verify"
+repository = "https://github.com/jedisct1/rust-minisign-verify"
+categories = ["cryptography"]
+edition = "2018"
+
+[profile.release]
+lto = true
+panic = "abort"
+opt-level = 3
+

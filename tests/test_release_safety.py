@@ -37,7 +37,7 @@ class ReleaseSafetyTests(unittest.TestCase):
         settings = Settings()
         self.assertFalse(settings.onboarding_completed)
         self.assertNotIn("Brahmshosh", settings.replacements.values())
-        self.assertEqual(settings.cleanup_provider, "none")
+        self.assertFalse(hasattr(settings, "cleanup_provider"))
         self.assertEqual(settings.backend, "whisper")
         self.assertFalse(settings.noise_suppression)
 

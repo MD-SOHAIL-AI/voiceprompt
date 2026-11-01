@@ -36,7 +36,7 @@ npm run build
 npx playwright install chromium
 node scripts/verify-ui.cjs --preview
 # From the root, build the complete native application and installer:
-./scripts/build_desktop.ps1
+./scripts/build_desktop.ps1 -AllowUnsignedPreview
 ./scripts/check_native.ps1
 ```
 
@@ -52,12 +52,23 @@ and Settings. The 112 x 32 DIP island expands to at most 320 x 400 DIP. Focus,
 Alarms and Notifications tabs expose quick controls and contest actions.
 Reminder previews and sounds wait until recording, recognition and paste finish.
 
+The transparent island enables `noRedirectionBitmap` on Windows. This bypasses
+Tao's legacy DWM blur-behind transparency path, which can leave stale window
+graphics under the WebView during focus and size changes. Keep it enabled when
+changing the island window configuration. Native appearance checks inspect the
+actual `WS_EX_NOREDIRECTIONBITMAP` window style across view changes; browser
+screenshots alone cannot verify Windows desktop compositing. Native minimize,
+maximize and close controls are disabled for the island; its in-app collapse
+control and the main window's controls remain available. Every visible island
+view strips the underlying caption, system-menu and sizing-frame styles on
+the main thread after queued visibility and focusability changes, including
+hide/show. Tao can restore caption styles even on undecorated top-level windows.
+Native checks verify those styles are absent.
+
 Raw microphone audio remains in the local speech engine. The waveform receives
-only a bounded 32-value amplitude envelope. Gemini/OpenRouter optionally receive
-transcript text for cleanup after explicit configuration. Provider keys use the
-Windows credential store; React keeps a key only in its unsaved password field
-and clears it after submission. Keys never enter snapshots or history.
+only a bounded 32-value amplitude envelope. AI processing stays on the device. Legacy cloud credentials are retired on upgrade. Model downloads and optional contest requests remain online; CLIST uses Windows Credential Manager.
 
 The app uses local fonts and code-rendered controls/waveforms. It contains no
-remote scripts, analytics or automatic release publishing. See the root README,
+remote scripts or analytics. Stable version tags publish verified app updates;
+routine main pushes do not. See `docs/app-updates.md`, the root README,
 `docs/desktop-redesign.md` and `docs/releasing.md` for acceptance limits.

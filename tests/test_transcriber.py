@@ -23,6 +23,16 @@ class FakeWhisperModel:
 
 class LocalTranscriberTests(unittest.TestCase):
     @patch("voiceprompt.transcriber.WhisperModel", FakeWhisperModel)
+    def test_phrase_decoding_requires_explicit_opt_in_and_finishes_once(self):
+        transcriber = LocalTranscriber(phrase_decoding=True)
+        self.assertTrue(transcriber.streaming)
+        with patch("faster_whisper.vad.get_speech_timestamps", return_value=[]):
+            transcriber.begin_session()
+            transcriber.accept_audio(np.ones(160100, dtype=np.float32))
+            self.assertEqual(transcriber.finish_session(), "hello ChatGPT hello ChatGPT")
+            self.assertEqual(transcriber.finish_session(), "")
+        self.assertFalse(LocalTranscriber().streaming)
+    @patch("voiceprompt.transcriber.WhisperModel", FakeWhisperModel)
     def test_option_updates_reuse_model_and_bias_vocabulary(self) -> None:
         FakeWhisperModel.instances.clear()
         transcriber = LocalTranscriber(beam_size=3, vad_filter=True)

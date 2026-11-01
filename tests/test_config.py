@@ -44,7 +44,7 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertNotIn("God", settings.replacements)
         self.assertEqual(settings.replacements["my project"], "MyProject")
         self.assertNotIn("brahmsulge", settings.replacements)
-        self.assertEqual(settings.config_version, 6)
+        self.assertEqual(settings.config_version, 7)
         self.assertEqual(settings.backend, "whisper")
         self.assertEqual(settings.cpu_threads, 4)
         self.assertFalse(settings.noise_suppression)
@@ -66,7 +66,7 @@ class ConfigMigrationTests(unittest.TestCase):
             path.write_text(json.dumps({"config_version": 3, "backend": "parakeet", "model": "base.en", "beam_size": 3, "language": ""}))
             with patch("voiceprompt.config.config_path", return_value=path):
                 settings = load_settings()
-        self.assertEqual(settings.config_version, 6)
+        self.assertEqual(settings.config_version, 7)
         self.assertEqual(settings.backend, "parakeet")
         self.assertEqual(settings.model, "base.en")
         self.assertEqual(settings.beam_size, 3)

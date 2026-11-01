@@ -11,10 +11,18 @@ export function HistoryPage() {
     [items, setItems] = useState<HistoryItem[]>([]),
     [total, setTotal] = useState(0),
     [offset, setOffset] = useState(0),
+    [previous, setPrevious] = useState<number[]>([]),
     [clear, setClear] = useState(false),
+    [detail, setDetail] = useState<HistoryItem | null>(null),
     [revision, setRevision] = useState(0);
   const action = useAction();
   const limit = useApp((s) => s.settings?.max_history ?? 0);
+  useEffect(() => {
+    if (offset && offset >= total) {
+      setOffset(0);
+      setPrevious([]);
+    }
+  }, [offset, total]);
   useEffect(() => {
     let alive = true;
     const timeout = setTimeout(() => {
@@ -41,10 +49,7 @@ export function HistoryPage() {
     <section>
       <header className="page-heading">
         <h1>History</h1>
-        <Button
-          disabled={!items.length || action.pending}
-          onClick={() => setClear(true)}
-        >
+        <Button disabled={action.pending} onClick={() => setClear(true)}>
           <Trash2 size={16} />
           Clear history
         </Button>
@@ -57,6 +62,7 @@ export function HistoryPage() {
           value={query}
           onChange={(e) => {
             setOffset(0);
+            setPrevious([]);
             setQuery(e.target.value);
           }}
         />
@@ -78,11 +84,32 @@ export function HistoryPage() {
                 </span>
               </div>
               <p>{item.text}</p>
+              {item.truncated && (
+                <Button
+                  disabled={action.pending}
+                  onClick={async () => {
+                    const full = await action.run<HistoryItem>("history.item", {
+                      id: item.id,
+                    });
+                    if (full) setDetail(full);
+                  }}
+                >
+                  Show full transcript
+                </Button>
+              )}
               <div className="button-row">
                 <Button
                   disabled={action.pending}
                   onClick={async () => {
-                    if (await action.run("clipboard.copy", { text: item.text }))
+                    const full = item.truncated
+                      ? await action.run<HistoryItem>("history.item", {
+                          id: item.id,
+                        })
+                      : item;
+                    if (
+                      full &&
+                      (await action.run("clipboard.copy", { text: full.text }))
+                    )
                       notify("Text copied.");
                   }}
                 >
@@ -114,22 +141,36 @@ export function HistoryPage() {
       <div className="pagination">
         <Button
           disabled={!offset}
-          onClick={() => setOffset(Math.max(0, offset - 20))}
+          onClick={() => {
+            setOffset(previous.at(-1) ?? 0);
+            setPrevious(previous.slice(0, -1));
+          }}
         >
           Previous
         </Button>
         <span>
           {total
-            ? `${offset + 1}–${Math.min(offset + 20, total)} of ${total}`
+            ? `${offset + 1}–${Math.min(offset + items.length, total)} of ${total}`
             : "0 transcripts"}
         </span>
         <Button
-          disabled={offset + 20 >= total}
-          onClick={() => setOffset(offset + 20)}
+          disabled={!items.length || offset + items.length >= total}
+          onClick={() => {
+            setPrevious([...previous, offset]);
+            setOffset(offset + items.length);
+          }}
         >
           Next
         </Button>
       </div>
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title="Saved transcript"
+        description="The complete transcript stored on this device."
+      >
+        <p className="transcript-text">{detail?.text}</p>
+      </Modal>
       <Modal
         open={clear}
         onClose={() => setClear(false)}

@@ -60,9 +60,10 @@ actual `WS_EX_NOREDIRECTIONBITMAP` window style across view changes; browser
 screenshots alone cannot verify Windows desktop compositing. Native minimize,
 maximize and close controls are disabled for the island; its in-app collapse
 control and the main window's controls remain available. Every visible island
-view also strips the underlying caption, system-menu and sizing-frame styles
-after focusability changes, since Tao retains caption styles even on
-undecorated top-level windows. Native checks verify those styles are absent.
+view strips the underlying caption, system-menu and sizing-frame styles on
+the main thread after queued visibility and focusability changes, including
+hide/show. Tao can restore caption styles even on undecorated top-level windows.
+Native checks verify those styles are absent.
 
 Raw microphone audio remains in the local speech engine. The waveform receives
 only a bounded 32-value amplitude envelope. AI processing stays on the device. Legacy cloud credentials are retired on upgrade. Model downloads and optional contest requests remain online; CLIST uses Windows Credential Manager.

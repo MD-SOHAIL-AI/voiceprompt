@@ -483,6 +483,41 @@ fn open_link(app: AppHandle, url: String) -> Result<(), String> {
         .map_err(|_| "Cannot open your browser.".into())
 }
 
+#[cfg(windows)]
+fn remove_island_frame(window: &WebviewWindow) -> Result<(), String> {
+    let own = window
+        .hwnd()
+        .map_err(|_| "Island unavailable.".to_string())?
+        .0 as isize;
+    window
+        .run_on_main_thread(move || unsafe {
+            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED,
+                SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_CAPTION, WS_MAXIMIZEBOX,
+                WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
+            };
+            // Tao restores caption styles when applying visibility or focus
+            // flags. Run after those queued operations, including hide/show.
+            let style = GetWindowLongPtrW(own as _, GWL_STYLE);
+            let frameless = style
+                & !((WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME)
+                    as isize);
+            if style != frameless {
+                SetWindowLongPtrW(own as _, GWL_STYLE, frameless);
+                SetWindowPos(
+                    own as _,
+                    std::ptr::null_mut(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+                );
+            }
+        })
+        .map_err(|_| "Cannot remove the island window frame.".to_string())
+}
+
 #[tauri::command]
 fn island_view(
     app: AppHandle,
@@ -519,7 +554,10 @@ fn island_view(
         }
     }
     if mode == "hidden" {
-        return window.hide().map_err(|_| "Cannot hide the island.".into());
+        window.hide().map_err(|_| "Cannot hide the island.")?;
+        #[cfg(windows)]
+        remove_island_frame(&window)?;
+        return Ok(());
     }
     let (width, height): (f64, f64) = match mode {
         "compact" => (112.0, 32.0),
@@ -557,31 +595,7 @@ fn island_view(
     #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED,
-            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_CAPTION, WS_MAXIMIZEBOX,
-            WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
-        };
         if let Ok(hwnd) = window.hwnd() {
-            // Tao retains caption styles on undecorated top-level windows.
-            // WebView2 transparency can expose that classic frame. Strip it
-            // after focusability changes, which may restore Tao's styles.
-            let style = GetWindowLongPtrW(hwnd.0 as _, GWL_STYLE);
-            let frameless = style
-                & !((WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME)
-                    as isize);
-            if style != frameless {
-                SetWindowLongPtrW(hwnd.0 as _, GWL_STYLE, frameless);
-                SetWindowPos(
-                    hwnd.0 as _,
-                    std::ptr::null_mut(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
-                );
-            }
             let radius = if mode == "compact" { 32.0 } else { 24.0 } * scale;
             let region = CreateRoundRectRgn(
                 0,
@@ -641,6 +655,8 @@ fn island_view(
             })
             .map_err(|_| "Cannot release the island keyboard focus.".to_string())?;
     }
+    #[cfg(windows)]
+    remove_island_frame(&window)?;
     Ok(())
 }
 

@@ -52,6 +52,18 @@ and Settings. The 112 x 32 DIP island expands to at most 320 x 400 DIP. Focus,
 Alarms and Notifications tabs expose quick controls and contest actions.
 Reminder previews and sounds wait until recording, recognition and paste finish.
 
+The transparent island enables `noRedirectionBitmap` on Windows. This bypasses
+Tao's legacy DWM blur-behind transparency path, which can leave stale window
+graphics under the WebView during focus and size changes. Keep it enabled when
+changing the island window configuration. Native appearance checks inspect the
+actual `WS_EX_NOREDIRECTIONBITMAP` window style across view changes; browser
+screenshots alone cannot verify Windows desktop compositing. Native minimize,
+maximize and close controls are disabled for the island; its in-app collapse
+control and the main window's controls remain available. Every visible island
+view also strips the underlying caption, system-menu and sizing-frame styles
+after focusability changes, since Tao retains caption styles even on
+undecorated top-level windows. Native checks verify those styles are absent.
+
 Raw microphone audio remains in the local speech engine. The waveform receives
 only a bounded 32-value amplitude envelope. AI processing stays on the device. Legacy cloud credentials are retired on upgrade. Model downloads and optional contest requests remain online; CLIST uses Windows Credential Manager.
 

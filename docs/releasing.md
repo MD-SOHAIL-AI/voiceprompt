@@ -84,6 +84,20 @@ physical microphone/keyboard behavior or compatibility with every destination ap
 
 Target repository: https://github.com/MD-SOHAIL-AI/voiceprompt
 
+### Verified beta publication
+
+Prepare the next numeric application version and
+`docs/release-notes-VERSION-beta.1.md`, then merge the checked release PR with
+`[publish-beta]` in its merge commit message. The Windows workflow publishes
+`vVERSION-beta.1` only after both regression and native-package jobs succeed.
+It uploads a draft, downloads the hosted installer again, checks its SHA-256,
+and publishes it as a prerelease. An existing release is never overwritten.
+Ordinary merges do not request publication. Beta downloads are manual and stay
+outside the stable updater feed; update-signing secrets are not required for
+this explicitly unsigned beta channel.
+
+### Other release paths
+
 CI tests pull requests and main, builds an explicitly unsigned test installer,
 and uploads artifacts labelled `VoicePrompt-windows-x64-unsigned-preview`.
 It does not create or publish releases. Review native bridge, frozen worker,

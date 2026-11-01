@@ -33,7 +33,9 @@ jobs:
       - name: Validate Python and metadata
         run: |
           python -m pip check
+          if ($LASTEXITCODE -ne 0) { throw 'Python dependency validation failed.' }
           python -m compileall -q voiceprompt tests
+          if ($LASTEXITCODE -ne 0) { throw 'Python compilation failed.' }
           python scripts/verify_versions.py
       - name: Audit Python dependencies
         shell: pwsh
@@ -47,18 +49,23 @@ jobs:
           VOICEPROMPT_TEST_LEGACY_TK: '0'
         run: |
           python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Python regressions failed.' }
           python scripts/check_engine_bridge.py
       - name: Frontend checks
         working-directory: desktop
         run: |
           npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
           npm run test
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend regressions failed.' }
           npm run build
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
           npm audit --omit=dev --audit-level=high
       - name: Browser interaction and accessibility checks
         working-directory: desktop
         run: |
           npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { throw 'Browser installation failed.' }
           node scripts/verify-ui.cjs --preview
       - uses: actions/upload-artifact@v4
         if: always()
@@ -98,6 +105,7 @@ jobs:
       - name: Rust checks
         run: |
           cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --lib
+          if ($LASTEXITCODE -ne 0) { throw 'Rust regressions failed.' }
           cargo clippy --manifest-path desktop/src-tauri/Cargo.toml --locked -- -D warnings
       - name: Audit pinned Rust dependencies
         shell: pwsh
@@ -110,6 +118,17 @@ jobs:
       - name: Verify installation and live uninstall
         shell: pwsh
         run: ./scripts/check_installer.ps1 -AllowUnsignedPreview
+      - name: Stage verified beta installer
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-beta]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoicePrompt-beta-release
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            release/VoicePrompt-Setup-*-x64-unsigned-preview.exe
+            release/VoicePrompt-Setup-*-x64-unsigned-preview.exe.sha256
+            release/VoicePrompt-Setup-*-x64-unsigned-preview.exe.signing.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -124,3 +143,43 @@ jobs:
             build/native-*.log
             build/uninstall-*.log
             .impeccable/review/native-*.png
+  publish-beta:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-beta]')
+    needs: [regressions, native-package]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: VoicePrompt-beta-release
+          path: release
+      - name: Publish verified Windows beta
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Select-String -Path pyproject.toml -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Beta application version must be numeric.' }
+          $tag = "v$version-beta.1"
+          $notes = "docs/release-notes-$version-beta.1.md"
+          $installer = "release/VoicePrompt-Setup-$version-x64-unsigned-preview.exe"
+          if (-not (Test-Path -LiteralPath $notes) -or -not (Test-Path -LiteralPath $installer)) { throw 'Beta release notes and the verified installer are required.' }
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Beta release source must be on main.' }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft
+          if ($LASTEXITCODE -eq 0) { throw 'Release already exists. Use a new version; never replace release assets.' }
+          $expected = ((Get-Content -LiteralPath "$installer.sha256" -Raw).Trim() -split '\s+')[0]
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Installer checksum does not match the verified artifact.' }
+          gh release create $tag $installer "$installer.sha256" "$installer.signing.json" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --prerelease --title "VoicePrompt $version Beta 1" --notes-file $notes
+          if ($LASTEXITCODE -ne 0) { throw 'Draft upload failed. Nothing was published.' }
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern (Split-Path -Leaf $installer) --dir build/published-beta-check
+          if ($LASTEXITCODE -ne 0) { throw 'Could not independently download the draft installer.' }
+          $hosted = Join-Path 'build/published-beta-check' (Split-Path -Leaf $installer)
+          if ((Get-FileHash -LiteralPath $hosted -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Hosted installer checksum differs. The release remains a draft.' }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Beta publication failed; inspect the draft.' }

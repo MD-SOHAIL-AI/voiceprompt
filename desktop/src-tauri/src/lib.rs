@@ -557,7 +557,31 @@ fn island_view(
     #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED,
+            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_CAPTION, WS_MAXIMIZEBOX,
+            WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
+        };
         if let Ok(hwnd) = window.hwnd() {
+            // Tao retains caption styles on undecorated top-level windows.
+            // WebView2 transparency can expose that classic frame. Strip it
+            // after focusability changes, which may restore Tao's styles.
+            let style = GetWindowLongPtrW(hwnd.0 as _, GWL_STYLE);
+            let frameless = style
+                & !((WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME)
+                    as isize);
+            if style != frameless {
+                SetWindowLongPtrW(hwnd.0 as _, GWL_STYLE, frameless);
+                SetWindowPos(
+                    hwnd.0 as _,
+                    std::ptr::null_mut(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+                );
+            }
             let radius = if mode == "compact" { 32.0 } else { 24.0 } * scale;
             let region = CreateRoundRectRgn(
                 0,
@@ -631,7 +655,8 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             GetForegroundWindow, GetGUIThreadInfo, GetWindowLongPtrW, IsChild, GUITHREADINFO,
-            GWL_EXSTYLE, WS_EX_NOACTIVATE,
+            GWL_EXSTYLE, GWL_STYLE, WS_CAPTION, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP,
+            WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
         };
         let own = window
             .hwnd()
@@ -640,10 +665,18 @@ fn island_status(app: AppHandle) -> Result<Value, String> {
         let mut info: GUITHREADINFO = std::mem::zeroed();
         info.cbSize = std::mem::size_of_val(&info) as u32;
         let gui_available = GetGUIThreadInfo(0, &mut info) != 0;
+        let style = GetWindowLongPtrW(own, GWL_EXSTYLE);
+        let frame = GetWindowLongPtrW(own, GWL_STYLE)
+            & (WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME) as isize;
         Ok(
             json!({"visible":visible, "reportedFocused":reported, "foreground":GetForegroundWindow() == own,
             "keyboardFocus":gui_available && (info.hwndFocus == own || IsChild(own, info.hwndFocus) != 0),
-            "nonActivating":GetWindowLongPtrW(own, GWL_EXSTYLE) & WS_EX_NOACTIVATE as isize != 0,
+            "nonActivating":style & WS_EX_NOACTIVATE as isize != 0,
+            "noRedirectionBitmap":style & WS_EX_NOREDIRECTIONBITMAP as isize != 0,
+            "nativeFrame":frame,
+            "minimizable":window.is_minimizable().unwrap_or(true),
+            "maximizable":window.is_maximizable().unwrap_or(true),
+            "closable":window.is_closable().unwrap_or(true),
             "guiAvailable":gui_available}),
         )
     }
@@ -703,6 +736,9 @@ pub fn run() {
         profile.hash(&mut hasher);
         context.config_mut().identifier =
             format!("app.voiceprompt.acceptance.a{:x}", hasher.finish());
+        context.config_mut().app.app_directories_override = Some(
+            tauri::utils::config::AppDirectoriesOverride::Root(profile.join("shell")),
+        );
     }
     for window in &mut context.config_mut().app.windows {
         window.devtools = Some(false);

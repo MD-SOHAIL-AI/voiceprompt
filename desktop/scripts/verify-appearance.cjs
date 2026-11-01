@@ -11,6 +11,20 @@ module.exports = async function verifyAppearance({
   shot,
   expand,
 }) {
+  async function verifyComposition() {
+    if (!native) return;
+    await expect
+      .poll(() =>
+        main.evaluate(() => window.__TAURI_INTERNALS__.invoke("island_status")),
+      )
+      .toMatchObject({
+        noRedirectionBitmap: true,
+        nativeFrame: 0,
+        minimizable: false,
+        maximizable: false,
+        closable: false,
+      });
+  }
   const settings = () =>
     main
       .getByRole("navigation", { name: "Main navigation" })
@@ -27,6 +41,7 @@ module.exports = async function verifyAppearance({
   });
   await show.check();
   await pin.check();
+  await verifyComposition();
   report.themes = [];
   for (const palette of [
     "Black",
@@ -191,6 +206,7 @@ module.exports = async function verifyAppearance({
   );
   await expect(island.locator("html")).toHaveAttribute("data-palette", "ocean");
   await expand("Focus");
+  await verifyComposition();
   await shot(island, "appearance-island-light");
   await expect(island.locator(".island-panel")).toHaveCSS("opacity", "1");
   await island
@@ -200,6 +216,7 @@ module.exports = async function verifyAppearance({
   await pin.check();
   await show.uncheck();
   await expect(island.locator(".island-frame")).toHaveCount(0);
+  await verifyComposition();
   if (native)
     await expect
       .poll(
@@ -213,6 +230,7 @@ module.exports = async function verifyAppearance({
       .toBe(false);
   await show.check();
   await expect(island.locator(".island-frame")).toHaveCount(1);
+  await verifyComposition();
   if (native) {
     // Empty only the disposable acceptance profile to exercise the idle state.
     const hub = await rpc("planner.snapshot");
@@ -226,6 +244,7 @@ module.exports = async function verifyAppearance({
     await expect(island.getByText("Ready", { exact: true })).toBeVisible({
       timeout: 10000,
     });
+    await verifyComposition();
     await pin.uncheck();
     await expect
       .poll(
@@ -283,4 +302,8 @@ module.exports = async function verifyAppearance({
   report.checks.push(
     "Twelve theme variants pass contrast and accessibility; keyboard, System changes, persistence, user-controlled transparency and two-window synchronization verified",
   );
+  if (native)
+    report.checks.push(
+      "The Windows island retains DirectComposition without native minimize/maximize/close controls across compact, expanded, hidden and restored views",
+    );
 };

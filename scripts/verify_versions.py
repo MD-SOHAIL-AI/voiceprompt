@@ -14,6 +14,16 @@ files = {'desktop/package.json': json.loads((root / 'desktop/package.json').read
          'voiceprompt/__init__.py': re.search(r'__version__ = "([^"]+)"', (root / 'voiceprompt/__init__.py').read_text())[1]}
 for name, value in files.items():
     if value != version: raise SystemExit(f'{name}: {value} differs from canonical version {version}')
+windows_version = (root / 'packaging/version.txt').read_text()
+numeric_version = tuple(map(int, version.split('-', 1)[0].split('.'))) + (0,)
+for field in ('filevers', 'prodvers'):
+    match = re.search(rf'{field}=\(([^)]+)\)', windows_version)
+    if not match or tuple(int(part.strip()) for part in match[1].split(',')) != numeric_version:
+        raise SystemExit(f'packaging/version.txt: {field} differs from canonical version {version}')
+for field in ('FileVersion', 'ProductVersion'):
+    match = re.search(rf"StringStruct\('{field}', '([^']+)'\)", windows_version)
+    if not match or match[1] != version:
+        raise SystemExit(f'packaging/version.txt: {field} differs from canonical version {version}')
 settings_source = (root / 'desktop/src/pages/Settings.tsx').read_text(encoding='utf-8')
 if 'Version {appVersion}' not in settings_source or 'version as appVersion' not in settings_source:
     raise SystemExit('Settings must display the package version, not a hardcoded release number.')

@@ -47,6 +47,7 @@ jobs:
       - name: Engine, storage, transport and recording regressions
         env:
           VOICEPROMPT_TEST_LEGACY_TK: '0'
+          HF_HOME: ${{ runner.temp }}/voiceprompt-test-hf
         run: |
           python -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { throw 'Python regressions failed.' }

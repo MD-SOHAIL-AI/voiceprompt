@@ -3,6 +3,12 @@
 Prepared for local installation. Committing this source does not publish a
 GitHub release or change the stable update feed.
 
+The corrected local installer embeds the frontend and opens without a local
+development server. If an earlier 0.7.0 installer opens a page saying
+`127.0.0.1 refused to connect`, close VoicePrompt and install the corrected
+package over it. Release builds now reject development-mode shells, and the
+packager verifies the embedded frontend before accepting a supplied executable.
+
 ## Included changes
 
 - Settings → Models provides eight pinned local model choices with download,
@@ -29,7 +35,7 @@ app requires restoring the compatible settings backup.
 
 ## Verification limits
 
-The implementation passed 221 Python tests (two additional checks skipped),
+The implementation passed 222 Python tests (two additional checks skipped),
 14 frontend tests, 14 Rust tests, Clippy, source/frozen bridge checks, four frozen
 worker import checks, browser model/recovery flows, and eight offline model
 replays. Nemotron replay also passed with suppression enabled and disabled.

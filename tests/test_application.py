@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import tempfile
 import threading
 import time
@@ -51,6 +52,14 @@ class ApplicationTests(unittest.TestCase):
         p = patch("voiceprompt.main.PushToTalkRecorder", return_value=recorder)
         p.start()
         self.addCleanup(p.stop)
+        # Controller tests use an available model without reading or hashing
+        # weights in the developer's shared cache. ModelLibrary has its own
+        # install, verification and missing-model tests with temporary assets.
+        p = patch("voiceprompt.model_library.ModelLibrary", autospec=True)
+        self.models = p.start().return_value
+        self.addCleanup(p.stop)
+        self.models.thread = None
+        self.models.runtime_settings.side_effect = lambda settings, **kwargs: copy.deepcopy(settings)
         self.app = VoicePromptApp(preload_model=False)
         self.app.hotkey.pressed = False
         self.app._ready = True
@@ -203,6 +212,23 @@ class ApplicationTests(unittest.TestCase):
             self.wait_idle()
         self.assertIs(self.app._failed_audio, chunks)
         self.assertTrue(self.app._ready)
+
+    def test_retry_with_unavailable_model_keeps_audio_and_stays_unready(self):
+        import numpy as np
+
+        chunks = ((np.ones(1600, dtype=np.float32), 16000),)
+        self.app._failed_audio = chunks
+        self.models.runtime_settings.side_effect = ValueError("Download the selected model before dictating.")
+        with patch.object(DictationSession, "run") as replay:
+            self.app.retry_failed()
+            self.wait_idle()
+        replay.assert_not_called()
+        self.backend.preload.assert_not_called()
+        self.app.injector.inject.assert_not_called()
+        self.assertIs(self.app._failed_audio, chunks)
+        self.assertFalse(self.app._ready)
+        self.assertIsNone(self.app._session)
+        self.assertIn("Download the selected model", self.app.last_error)
 
     def test_pending_settings_patches_are_merged(self):
         from voiceprompt.desktop_sidecar import DesktopService

@@ -783,8 +783,26 @@ pub fn run() {
     if updates::helper_mode() {
         return;
     }
-    let smoke = std::env::args().any(|arg| arg == "--smoke-test");
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let smoke = arguments.first().is_some_and(|arg| arg == "--smoke-test");
     let mut context = tauri::generate_context!();
+    // Inspect a supplied shell before creating any WebView, speech worker,
+    // hooks or user profile. Version resources alone cannot prove it embeds UI.
+    if arguments.first().is_some_and(|arg| arg == "--build-info") {
+        if arguments.len() != 2 {
+            std::process::exit(2);
+        }
+        let info = json!({
+            "version": env!("CARGO_PKG_VERSION"),
+            "production": !tauri::is_dev(),
+            "embedded_frontend": context.assets().get(&"index.html".into()).is_some(),
+            "debug": cfg!(debug_assertions),
+        });
+        if std::fs::write(&arguments[1], info.to_string()).is_err() {
+            std::process::exit(1);
+        }
+        return;
+    }
     let acceptance = std::env::var_os("VOICEPROMPT_ACCEPTANCE_DIR")
         .map(std::path::PathBuf::from)
         .filter(|path| path.is_absolute());

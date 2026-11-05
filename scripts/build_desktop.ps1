@@ -11,6 +11,21 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'windows_signing.ps1')
+function Assert-VoicePromptProductionShell([string]$Executable, [string]$ExpectedVersion) {
+    $probePath = Join-Path $projectRoot ('build\shell-build-info-' + [guid]::NewGuid().ToString('N') + '.json')
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $probePath) | Out-Null
+    $probe = Start-Process -FilePath $Executable -ArgumentList @('--build-info', ('"' + $probePath + '"')) -WindowStyle Hidden -PassThru
+    try {
+        if (-not $probe.WaitForExit(10000)) { $probe.Kill(); throw 'Desktop build inspection timed out. Rebuild the shell with the Tauri production build command.' }
+        if ($probe.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $probePath)) { throw 'Desktop build inspection failed. Rebuild the shell before packaging.' }
+        $info = Get-Content -LiteralPath $probePath -Raw | ConvertFrom-Json
+        if ($info.version -ne $ExpectedVersion -or -not $info.production -or -not $info.embedded_frontend -or $info.debug) {
+            throw 'The desktop shell must be a production release with embedded frontend assets. Development-server shells cannot be packaged.'
+        }
+    } finally {
+        if (Test-Path -LiteralPath $probePath) { Remove-Item -LiteralPath $probePath }
+    }
+}
 # Refuse an accidental unsigned release before building or replacing any files.
 $signing = Initialize-VoicePromptSigning -Thumbprint $SignThumbprint -SignToolPath $SignToolPath -CertificateStore $CertificateStore -AllowUnsignedPreview:$AllowUnsignedPreview
 if (-not $Python) { $Python = if (Test-Path -LiteralPath (Join-Path $projectRoot '.venv311\Scripts\python.exe')) { '.venv311\Scripts\python.exe' } else { '.venv\Scripts\python.exe' } }
@@ -24,6 +39,7 @@ try {
         if ([IO.Path]::GetExtension($nativePath) -ne '.exe') { throw 'NativeExecutable must be an existing Windows executable' }
         $shellVersion = (Get-Item -LiteralPath $nativePath).VersionInfo.ProductVersion
         if ($shellVersion -ne $version) { throw "Desktop shell $shellVersion differs from engine $version. Rebuild the desktop shell before packaging this update." }
+        Assert-VoicePromptProductionShell -Executable $nativePath -ExpectedVersion $version
         # Keep an explicit supplied shell outside the staging directory, which
         # is replaced below only after the repaired engine builds successfully.
         $nativeCopy = Join-Path $projectRoot 'build\VoicePrompt-supplied-shell.exe'
@@ -51,6 +67,7 @@ try {
         $nativePath = Join-Path $projectRoot 'desktop\src-tauri\target\release\VoicePrompt.exe'
     }
     if ((Get-Item -LiteralPath $nativePath).VersionInfo.ProductVersion -ne $version) { throw 'Desktop executable version differs from the release. Rebuild the desktop before packaging.' }
+    Assert-VoicePromptProductionShell -Executable $nativePath -ExpectedVersion $version
     $stage = Join-Path $projectRoot 'dist\VoicePrompt'
     if ([IO.Path]::GetFullPath($stage) -ne (Join-Path $projectRoot 'dist\VoicePrompt')) { throw 'Unexpected stage path' }
     # Existing builds remain intact until both components have built successfully.

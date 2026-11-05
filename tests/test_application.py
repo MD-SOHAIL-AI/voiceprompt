@@ -88,6 +88,55 @@ class ApplicationTests(unittest.TestCase):
         self.app.injector.inject.assert_called_once_with("hello", target_window=123, cancelled=ANY)
         self.assertEqual(self.app.history.last(), "hello")
 
+    def test_failed_recording_clears_pending_and_does_not_block_update_after_discard(self):
+        self.app.recorder.is_recording = False
+        self.app._working = True
+        self.app._current_id = 1
+        self.app.insertion_status = 'pending'
+        with patch.object(DictationSession, 'run', side_effect=IncompleteRecording('timeout')):
+            self.app._dictation_worker(DictationSession(1), self.app.settings)
+        self.app.discard_failed()
+        self.assertNotEqual(self.app.insertion_status, 'pending')
+        self.app.prepare_update()
+
+    def test_success_retains_audio_for_explicit_retranscription(self):
+        import numpy as np
+        def run(session, *args, **kwargs):
+            session.audio_queue.put(np.ones(1600, dtype=np.float32), 16000)
+            session.request_release()
+            return 'possibly short text', .1
+        with patch.object(DictationSession, 'run', run):
+            self.app.start_recording(); self.wait_idle()
+        self.assertIsNotNone(self.app._recent_audio)
+        self.assertEqual(self.app._delivery_text, 'possibly short text')
+
+    def test_stale_paste_action_cannot_send_previous_transcript(self):
+        self.app._delivery_session_id = 10
+        self.app._delivery_text = 'current'
+        with self.assertRaisesRegex(ValueError, 'replaced'): self.app.paste_result(9)
+        self.app.injector.inject.assert_not_called()
+
+    def test_deleting_selected_model_clears_readiness_without_preparing_another(self):
+        self.app.models = MagicMock()
+        self.app.models.delete.return_value = 100
+        self.app.settings.selected_model_id = 'test-model'
+        with patch.object(self.app, '_prepare') as prepare:
+            self.assertEqual(self.app.delete_model('test-model', allow_shared=True), 100)
+        self.assertEqual(self.app.settings.selected_model_id, 'none')
+        self.assertFalse(self.app._ready)
+        self.backend.close.assert_called_once()
+        prepare.assert_not_called()
+
+    def test_bad_replacement_keeps_previous_model_selection(self):
+        old = self.app.settings.selected_model_id
+        self.app.models = MagicMock()
+        self.app.models.model.return_value = {'engine': 'whisper', 'variant': 'tiny.en'}
+        self.app.models.runtime_settings.side_effect = ValueError('verification failed')
+        self.app.select_model('replacement')
+        self.wait_idle()
+        self.assertEqual(self.app.settings.selected_model_id, old)
+        self.assertIn('verification failed', self.app.last_error)
+
     def test_diagnostics_and_history_failures_do_not_block_dictation(self):
         def run(session, *args, **kwargs):
             session.request_release()

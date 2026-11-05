@@ -18,6 +18,7 @@ export type SessionStatus =
   | "transcribing"
   | "error";
 export interface Settings {
+  selected_model_id: string;
   config_version: number;
   onboarding_completed: boolean;
   backend: "whisper" | "moonshine" | "parakeet" | "nemotron";
@@ -65,7 +66,13 @@ export interface Runtime {
   detail: string;
   failedAudio: boolean;
   recording: boolean;
-  insertionStatus: "none" | "pending" | "pasted" | "copy";
+  insertionStatus: "none" | "pending" | "pasted" | "sent" | "copy" | "copied" | "failed" | "cancelled";
+  insertionReason?: string;
+  deliveryPending?: boolean;
+  deliverySessionId?: number;
+  canPastePrevious?: boolean;
+  canRetryRecent?: boolean;
+  canRestoreClipboard?: boolean;
   deferReminders: boolean;
   download: Record<string, unknown>;
   runtimeInfo: string;

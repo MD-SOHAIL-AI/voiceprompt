@@ -15,6 +15,7 @@ import { notify, useApp } from "../store";
 import { statusLabels } from "../types";
 import { Button, Field, Modal, useAction } from "../components/ui";
 import { Waveform } from "../components/Waveform";
+import { DeliveryActions } from "../components/DeliveryActions";
 
 export function DictationPage() {
   const runtime = useApp((s) => s.runtime)!,
@@ -230,13 +231,14 @@ export function DictationPage() {
             <History size={17} />
             Open history
           </Button>
-          {runtime.insertionStatus === "pasted" && (
+          {runtime.insertionStatus === "sent" && (
             <span className="success-copy">
               <Check size={16} />
-              Text pasted
+              Paste sent
             </span>
           )}
         </div>
+        <DeliveryActions />
       </div>
       <p className="page-footnote">
         {!runtime.working && !runtime.error
@@ -280,6 +282,11 @@ export function Onboarding() {
             The first preparation downloads the selected model. Cached models
             work offline.
           </p>
+          <Button
+            onClick={() => { setOpen(false); navigate("Settings"); }}
+          >
+            Choose and download a model
+          </Button>
           <Button
             disabled={runtime.working || action.pending}
             onClick={() => void action.run("prepare")}

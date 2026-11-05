@@ -46,7 +46,7 @@ class LocalPrivacyTests(unittest.TestCase):
             path.write_text(json.dumps(original), encoding="utf-8")
             with patch("voiceprompt.config.config_path", return_value=path):
                 settings = load_settings()
-            self.assertEqual(settings.config_version, 7)
+            self.assertEqual(settings.config_version, 8)
             self.assertEqual(settings.backend, "nemotron")
             self.assertEqual(settings.hotkey, "f9")
             self.assertNotIn("cleanup_provider", asdict(settings))

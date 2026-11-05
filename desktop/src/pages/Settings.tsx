@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Save } from "lucide-react";
 import { notify, useApp } from "../store";
 import type { Settings } from "../types";
@@ -6,6 +6,7 @@ import { Button, Field, Toggle, useAction } from "../components/ui";
 import { AppearanceSettings } from "../components/AppearanceSettings";
 import { version as appVersion } from "../../package.json";
 import { Updates } from "../components/Updates";
+import { ModelLibrary } from "../components/ModelLibrary";
 import { useUnsavedChanges } from "../lib/updates";
 
 export function SettingsPage() {
@@ -32,6 +33,13 @@ export function SettingsPage() {
   );
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) =>
     setForm((previous) => ({ ...previous, [key]: value }));
+  useEffect(() => {
+    // Model selection is applied immediately by the library; keep unrelated
+    // unsaved settings while adopting the authoritative speech choice.
+    const speech = { selected_model_id: saved.selected_model_id, backend: saved.backend, model: saved.model, streaming_model: saved.streaming_model };
+    baseline.current = { ...baseline.current, ...speech };
+    setForm((draft) => ({ ...draft, ...speech }));
+  }, [saved.selected_model_id, saved.backend, saved.model, saved.streaming_model]);
   const select = <K extends keyof Settings>(
     key: K,
     label: string,
@@ -163,24 +171,22 @@ export function SettingsPage() {
           />
           <Toggle
             label="Restore clipboard after automatic paste"
+            hint="Restores after an observed destination read. If that cannot be confirmed, use Restore previous clipboard."
             checked={form.preserve_clipboard}
             onChange={(value) => set("preserve_clipboard", value)}
           />
         </section>
+        <ModelLibrary />
         <section className="settings-section">
-          <h2>Local speech model</h2>
-          {select("backend", "Recognition engine", [
-            ["whisper", "Whisper"],
-            ["moonshine", "Moonshine"],
-            ["parakeet", "Parakeet"],
-            ["nemotron", "Nemotron"],
-          ])}
+          <h2>Speech preferences</h2>
+          <p className="muted">Choose and prepare your recognition model in the library above.</p>
           <details>
             <summary>Advanced speech settings</summary>
             <div className="form-grid">
               <Field label="Whisper model">
                 <input
                   value={form.model}
+                  readOnly={form.selected_model_id !== "legacy"}
                   onChange={(e) => set("model", e.target.value)}
                 />
               </Field>
@@ -190,10 +196,7 @@ export function SettingsPage() {
                   onChange={(e) => set("language", e.target.value)}
                 />
               </Field>
-              {select("streaming_model", "Moonshine model", [
-                ["tiny", "Tiny"],
-                ["small", "Small"],
-              ])}
+              {form.backend === "moonshine" && <p className="muted">Moonshine {saved.streaming_model}. Choose a different model in the library.</p>}
               {select("nemotron_device", "Nemotron device", [
                 ["vulkan", "Vulkan"],
                 ["cpu", "CPU"],

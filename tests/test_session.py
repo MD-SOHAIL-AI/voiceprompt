@@ -105,6 +105,21 @@ class SessionTests(unittest.TestCase):
         backend.finish_session.assert_not_called()
         backend.abort_session.assert_called_once()
 
+    def test_missing_audio_delivery_cannot_be_accepted_as_complete(self):
+        session = DictationSession(1)
+        recorder = self.make_recorder(session)
+        original_stop = recorder.stop.side_effect
+        def incomplete_delivery(**kwargs):
+            recording = original_stop(**kwargs)
+            return Recording(recording.audio, recording.sample_rate, .3)
+        recorder.stop.side_effect = incomplete_delivery
+        backend = MagicMock()
+        backend.finish_session.return_value = 'a misleading prefix'
+        with self.assertRaisesRegex(IncompleteRecording, 'Recognition failed'):
+            session.run(recorder, backend, hotwords='', noise_suppression=False)
+        backend.finish_session.assert_not_called()
+        self.assertTrue(session.audio_queue.retained())
+
     def test_release_before_capture_starts_is_ignored(self):
         session = DictationSession(1)
         session.request_release()

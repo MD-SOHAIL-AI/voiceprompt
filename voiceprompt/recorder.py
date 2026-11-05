@@ -49,6 +49,7 @@ class PushToTalkRecorder:
         self._envelope_samples = 0
         self.input_overflows = 0
         self.callback_error = ""
+        self._unexpected_stop = False
         self.sample_rate = self.config.sample_rate
         self.capture_open_seconds = 0.0
         self.input_latency_seconds = 0.0
@@ -68,7 +69,7 @@ class PushToTalkRecorder:
 
     @property
     def capture_failed(self) -> bool:
-        return bool(self._capturing and self._stream is not None and not self._stream.active)
+        return self._unexpected_stop or bool(self._capturing and self._stream is not None and not self._stream.active)
 
     def prepare(self) -> None:
         """Validate start/stop, then leave capture inactive before dictation."""
@@ -147,6 +148,7 @@ class PushToTalkRecorder:
             self._envelope.extend([0.0] * 32)
             self._envelope_level = self._envelope_samples = 0
             self.callback_error = ""
+            self._unexpected_stop = False
             self._capturing = True
         try:
             self._stream.start()
@@ -160,6 +162,8 @@ class PushToTalkRecorder:
             return None
         released_at = released_at or time.perf_counter()
         held_seconds = released_at - self._started_at
+        if not stream.active:
+            self._unexpected_stop = True
         # Continue retaining callback frames until the release grace deadline.
         if grace:
             time.sleep(max(0.0, released_at + self.config.release_grace_seconds - time.perf_counter()))

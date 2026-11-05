@@ -83,6 +83,12 @@ class DesktopService:
                     "appliedSettingsRevision": getattr(app, "_applied_settings_revision", 0),
                     "error": app.last_error, "detail": app.detail, "failedAudio": bool(app._failed_audio),
                     "recording": bool(app.recorder.is_recording), "insertionStatus": getattr(app, "insertion_status", "none"),
+                    "insertionReason": getattr(app, "insertion_reason", ""),
+                    "deliveryPending": getattr(app, "delivery_pending", False),
+                    "deliverySessionId": getattr(app, "_delivery_session_id", 0),
+                    "canPastePrevious": bool(getattr(app, '_delivery_target', 0)),
+                    "canRetryRecent": bool(getattr(app, "_recent_audio", None)),
+                    "canRestoreClipboard": bool(getattr(app.injector, "can_restore", False)),
                     "deferReminders": bool(app._reminder_audio_busy()),
                     "acceptanceProfile": bool(os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR")),
                     "download": app.download_progress, "runtimeInfo": app.runtime_info(), "plannerError": app._planner_error}
@@ -122,6 +128,33 @@ class DesktopService:
 
     def dispatch(self, method, params):
         app = self.app
+        if method == 'models.list':
+            return app.models.snapshot(app.settings.selected_model_id)
+        if method == 'models.catalog.apply':
+            # Native shell verifies signed bytes before this internal command.
+            app.models.apply_catalog(params['catalog'])
+            if not os.environ.get('VOICEPROMPT_ACCEPTANCE_DIR') and app.settings.preload_model and not app._working and not app._ready and app.settings.selected_model_id != 'none':
+                app.preload_model()
+            return {'ok': True}
+        if method.startswith('models.') and getattr(app, '_updating', False):
+            raise ValueError('VoicePrompt is closing to update.')
+        if method == 'models.download':
+            if os.environ.get('VOICEPROMPT_ACCEPTANCE_DIR'):
+                raise ValueError('Model downloads are disabled in isolated verification profiles.')
+            app.models.download(params['id'])
+            return {'ok': True}
+        if method == 'models.cancel':
+            app.models.cancel()
+            return {'ok': True}
+        if method == 'models.select':
+            if os.environ.get('VOICEPROMPT_ACCEPTANCE_DIR'):
+                raise ValueError('Model preparation is disabled in isolated verification profiles.')
+            app.select_model(params['id'])
+            return {'ok': True}
+        if method == 'models.delete':
+            if os.environ.get('VOICEPROMPT_ACCEPTANCE_DIR'):
+                raise ValueError('Model cache deletion is disabled in isolated verification profiles.')
+            return {'freedBytes': app.delete_model(params['id'], allow_shared=params.get('allowShared') is True)}
         if method == "update.prepare":
             app.prepare_update()
             return {"ok": True}
@@ -130,7 +163,7 @@ class DesktopService:
             return {"ok": True}
         if getattr(app, "_updating", False) and method not in {"runtime", "shutdown", "bootstrap"}:
             raise ValueError("VoicePrompt is closing to install an update.")
-        if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") and method in {"prepare", "microphone.check", "record.start", "record.retry"}:
+        if os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR") and method in {"prepare", "microphone.check", "record.start", "record.retry", "record.retry_recent"}:
             raise ValueError("Microphone capture and speech preparation are disabled in an isolated verification profile.")
         if method == "bootstrap":
             sequence = self.writer.sequence
@@ -149,6 +182,18 @@ class DesktopService:
         elif method == "record.stop": app.stop_recording()
         elif method == "record.cancel": app.cancel_current()
         elif method == "record.retry": app.retry_failed()
+        elif method == "record.retry_recent": app.retry_failed(recent=True)
+        elif method == "dictation.paste":
+            app.paste_result(params.get("sessionId"), replace_clipboard=params.get("replaceClipboard") is True)
+        elif method == 'dictation.destination':
+            if params.get('sessionId') != app._delivery_session_id or not app._delivery_text:
+                raise ValueError('This transcript was replaced. Use the current transcript.')
+            return {'window': app._delivery_target}
+        elif method == "dictation.dismiss":
+            app.delivery_pending = False
+        elif method == "clipboard.restore":
+            if not app.injector.restore_previous():
+                raise ValueError("The clipboard has changed; its newer contents were kept.")
         elif method == "record.discard": app.discard_failed()
         elif method == "settings.save":
             with app._control:
@@ -189,6 +234,8 @@ class DesktopService:
             with app._control:
                 app.injector.cancel_restore()
                 pyperclip.copy(text)
+                app.delivery_pending = False
+                app.insertion_status = "copied"
         elif method == "island.position": app.update_pill_position(int(params["x"]), int(params["y"]))
         elif method == "shutdown":
             self.stop.set()
@@ -251,6 +298,7 @@ class DesktopService:
 
     def pump(self):
         last_state = last_planner = last_settings = None
+        last_model_operation = None
         planner_at = runtime_at = 0.0
         try:
             while not self.stop.wait(1 / 30) and not self.app._quitting:
@@ -268,6 +316,12 @@ class DesktopService:
                             update.pop("latestText")
                         self.emit("runtime", update)
                         last_state = state
+                    models = getattr(self.app, 'models', None)
+                    if models is not None:
+                        operation = dict(models.job)
+                        if operation != last_model_operation:
+                            self.emit('model-operation', operation)
+                            last_model_operation = operation
                 if self.app.recorder.is_recording:
                     self.emit("meter", {"sessionId": self.app._current_id, "values": self.app.recorder.envelope()})
                 if now - planner_at >= 0.5:

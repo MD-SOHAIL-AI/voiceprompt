@@ -46,6 +46,14 @@ pub fn key_data(key: &str) -> Result<&str, String> {
 }
 
 pub fn verify_envelope(bytes: &[u8], key: &str) -> Result<(Envelope, Manifest), String> {
+    let envelope = verify_payload(bytes, key)?;
+    let manifest: Manifest = serde_json::from_str(&envelope.payload)
+        .map_err(|_| "The signed update information is unreadable.")?;
+    validate_manifest(&manifest)?;
+    Ok((envelope, manifest))
+}
+
+pub fn verify_payload(bytes: &[u8], key: &str) -> Result<Envelope, String> {
     if bytes.len() as u64 > MAX_METADATA {
         return Err("Update information exceeds its size limit.".into());
     }
@@ -57,10 +65,7 @@ pub fn verify_envelope(bytes: &[u8], key: &str) -> Result<(Envelope, Manifest), 
         .map_err(|_| "The update signature is unreadable.")?;
     key.verify(envelope.payload.as_bytes(), &signature, false)
         .map_err(|_| "Update verification failed. No installer will run.")?;
-    let manifest: Manifest = serde_json::from_str(&envelope.payload)
-        .map_err(|_| "The signed update information is unreadable.")?;
-    validate_manifest(&manifest)?;
-    Ok((envelope, manifest))
+    Ok(envelope)
 }
 
 pub fn stable_version(version: &str) -> Result<semver::Version, String> {

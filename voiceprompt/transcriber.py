@@ -174,10 +174,11 @@ class MoonshineTranscriber:
     backend_name = "moonshine"
     streaming = True
 
-    def __init__(self, model_name: str = "tiny") -> None:
+    def __init__(self, model_name: str = "tiny", model_directory: str = "") -> None:
         if model_name not in {"tiny", "small"}:
             raise ValueError("Moonshine model must be tiny or small.")
         self.model_name = model_name
+        self.model_directory = model_directory
         self.loaded_model = ""
         self.fallback_reason = ""
         self._model = None
@@ -192,7 +193,7 @@ class MoonshineTranscriber:
             from moonshine_voice import ModelArch, Transcriber, get_model_for_language
 
             arch = ModelArch.SMALL_STREAMING if self.model_name == "small" else ModelArch.TINY_STREAMING
-            model_path, arch = get_model_for_language(
+            model_path, arch = (self.model_directory, arch) if self.model_directory else get_model_for_language(
                 wanted_language="en", wanted_model_arch=arch,
                 on_progress=lambda fraction, filename: report_progress(
                     {"phase": "Downloading Moonshine model", "name": filename, "completed": fraction, "total": 1}),
@@ -288,12 +289,13 @@ def create_transcriber(settings: Settings) -> TranscriptionBackend:
     if settings.backend == "parakeet":
         from voiceprompt.parakeet import ParakeetTranscriber
 
-        return ParakeetTranscriber(cpu_threads=settings.cpu_threads)
+        return ParakeetTranscriber(cpu_threads=settings.cpu_threads, model_directory=getattr(settings, 'model_directory', ''))
     if settings.backend == "moonshine":
-        return MoonshineTranscriber(settings.streaming_model)
+        return MoonshineTranscriber(settings.streaming_model, getattr(settings, 'model_directory', ''))
     return LocalTranscriber(
         model_name=settings.model, language=settings.language, device=settings.device,
         compute_type=settings.compute_type, beam_size=settings.beam_size,
         vad_filter=settings.vad_filter, cpu_threads=settings.cpu_threads,
         phrase_decoding=settings.whisper_phrase_decoding,
+        fallback_model_name=settings.model if getattr(settings, 'model_directory', '') else 'base.en',
     )

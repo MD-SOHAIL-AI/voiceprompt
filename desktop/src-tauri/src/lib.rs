@@ -13,6 +13,7 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_opener::OpenerExt;
 
+mod model_catalog;
 mod update_core;
 mod update_http;
 mod updates;
@@ -366,11 +367,46 @@ async fn engine_request(
     params: Value,
     state: State<'_, DesktopState>,
 ) -> Result<Value, String> {
-    if method == "shutdown" || method.starts_with("update.") {
+    if method == "shutdown"
+        || method.starts_with("update.")
+        || method == "models.catalog.apply"
+        || method == "dictation.destination"
+    {
         return Err("Use the app's Quit action.".into());
     }
     let engine = engine(&state)?;
     tauri::async_runtime::spawn_blocking(move || {
+        if method == "dictation.paste" {
+            let destination = engine.request("dictation.destination", params.clone())?;
+            #[cfg(windows)]
+            unsafe {
+                use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, SetForegroundWindow};
+                let window = destination["window"].as_u64().unwrap_or(0) as usize as _;
+                if IsWindow(window) != 0 {
+                    SetForegroundWindow(window);
+                }
+            }
+        }
+        if method == "models.refresh" {
+            let result =
+                model_catalog::refresh(params["manual"].as_bool().unwrap_or(true), |catalog| {
+                    engine
+                        .request("models.catalog.apply", json!({"catalog": catalog}))
+                        .map(|_| ())
+                })?;
+            return Ok(result["status"].clone());
+        }
+        if method == "models.preferences" {
+            return model_catalog::preferences(
+                params["enabled"]
+                    .as_bool()
+                    .ok_or("Choose whether to check for models automatically.")?,
+            );
+        }
+        if method == "models.catalog.status" {
+            return serde_json::to_value(model_catalog::status())
+                .map_err(|_| "Catalog status unavailable.".to_string());
+        }
         let mut result = engine.request(&method, params)?;
         if method == "bootstrap" {
             result["engineGeneration"] = json!(engine.generation);
@@ -415,6 +451,12 @@ async fn restart_engine(app: AppHandle, state: State<'_, DesktopState>) -> Resul
             *failure = Some(error.clone());
         }
     })?;
+    if let Some(catalog) = model_catalog::cached() {
+        let catalog_engine = replacement.clone();
+        thread::spawn(move || {
+            let _ = catalog_engine.request("models.catalog.apply", json!({"catalog": catalog}));
+        });
+    }
     let generation = replacement.generation;
     *state.engine.lock().map_err(|_| "Engine unavailable.")? = Some(replacement);
     app.emit("engine-restarted", generation)
@@ -827,6 +869,18 @@ pub fn run() {
             let handle = app.handle().clone();
             match spawn_engine(&handle) {
                 Ok(engine) => {
+                    let catalog_engine = engine.clone();
+                    thread::spawn(move || {
+                        if let Some(catalog) = model_catalog::cached() {
+                            let _ = catalog_engine
+                                .request("models.catalog.apply", json!({"catalog": catalog}));
+                        }
+                        let _ = model_catalog::refresh(false, |catalog| {
+                            catalog_engine
+                                .request("models.catalog.apply", json!({"catalog": catalog}))
+                                .map(|_| ())
+                        });
+                    });
                     *app.state::<DesktopState>().engine.lock().unwrap() = Some(engine);
                 }
                 Err(error) => {

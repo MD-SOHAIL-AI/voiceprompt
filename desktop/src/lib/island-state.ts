@@ -1,6 +1,7 @@
 import type { HubSnapshot, Runtime } from "../types";
 export type IslandKind =
   | "hidden"
+  | "delivery"
   | "error"
   | "recording"
   | "processing"
@@ -24,6 +25,7 @@ export function islandKind(
   if (runtime.status === "transcribing" || runtime.status === "starting")
     return "processing";
   if (runtime.error || runtime.failedAudio) return "error";
+  if (runtime.deliveryPending) return "delivery";
   if (runtime.status === "loading model") return "preparing";
   if (hub?.timer && ["running", "paused"].includes(hub.timer.status))
     return "focus";

@@ -35,6 +35,8 @@ class AudioQueue:
         self.retain = retain
         self.peak_seconds = 0.0
         self.overflow = False
+        self.accepted_samples = 0
+        self.sample_rate = None
 
     @property
     def seconds(self):
@@ -47,8 +49,11 @@ class AudioQueue:
             return not self._chunks
 
     def put(self, audio: np.ndarray, sample_rate: int):
+        if sample_rate <= 0 or (self.sample_rate is not None and sample_rate != self.sample_rate):
+            raise IncompleteRecording("The microphone sample rate changed during recording. Nothing was pasted.")
         seconds = len(audio) / sample_rate
         with self._condition:
+            self.sample_rate = sample_rate
             if self.overflow:
                 return
             used = self._total_seconds if self.retain else self._seconds
@@ -60,6 +65,7 @@ class AudioQueue:
                 if self.retain:
                     self._archive.append(item)
                 self._total_seconds += seconds
+                self.accepted_samples += len(audio)
                 self._seconds += seconds
                 self.peak_seconds = max(self.peak_seconds, self._seconds)
             self._condition.notify_all()
@@ -121,9 +127,10 @@ class DictationSession:
         recording = None
         decoding_seconds = 0.0
         decoded_audio_seconds = 0.0
+        decoded_samples = 0
 
         def decode():
-            nonlocal decoding_seconds, decoded_audio_seconds
+            nonlocal decoding_seconds, decoded_audio_seconds, decoded_samples
             try:
                 # Stream creation can stall in native code. Start capture first
                 # and keep those initial words in the queue while it completes.
@@ -144,19 +151,27 @@ class DictationSession:
                         backend.accept_audio(processed)
                         decoding_seconds += time.perf_counter() - then
                         decoded_audio_seconds += len(audio) / rate
+                        decoded_samples += len(audio)
                     elif capture_done.is_set() and self.audio_queue.empty:
                         # A callback may enqueue the release tail between an
                         # empty read and capture_done. Recheck under the queue's
                         # lock after observing completion before finalizing.
                         break
                 if valid_recording.is_set() and not self.cancel.is_set():
+                    expected = round(recording.duration_seconds * recorder.sample_rate)
+                    if abs(expected - self.audio_queue.accepted_samples) > 1 or decoded_samples != self.audio_queue.accepted_samples:
+                        raise IncompleteRecording("Some microphone audio did not reach recognition. Nothing was pasted; retry the recording.")
                     self.phase = "finalizing"
                     then = time.perf_counter()
                     backend.accept_audio(processor.process(np.empty(0, dtype=np.float32), final=True))
+                    if abs(processor._output_samples - round(decoded_samples * 16000 / recorder.sample_rate)) > 1:
+                        raise IncompleteRecording("Audio processing did not finish the complete recording. Nothing was pasted.")
                     result.append(backend.finish_session())
                     self.metrics["native_finalization_seconds"] = time.perf_counter() - then
                     decoding_seconds += time.perf_counter() - then
             except Exception as exc:
+                self.metrics['failure_phase'] = self.phase
+                self.metrics['recognition_error_type'] = type(exc).__name__
                 errors.append(exc)
             finally:
                 # The decoder owns processing. Even if interruption outlives
@@ -246,6 +261,8 @@ class DictationSession:
                 queue_peak_seconds=self.audio_queue.peak_seconds, queue_overflow=self.audio_queue.overflow,
                 input_overflows=recorder.input_overflows, capture_open_seconds=recorder.capture_open_seconds,
                 input_latency_seconds=recorder.input_latency_seconds, capture_host_api=recorder.host_api,
+                queued_samples=self.audio_queue.accepted_samples, submitted_samples=decoded_samples,
+                processed_samples=processor._output_samples if processor is not None else 0,
             )
 
     @staticmethod

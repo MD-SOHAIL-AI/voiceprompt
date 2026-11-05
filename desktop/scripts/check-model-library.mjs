@@ -1,0 +1,56 @@
+import { chromium, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { mkdir, writeFile } from 'node:fs/promises';
+
+const output = new URL('../../build/model-library-review/', import.meta.url);
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true });
+const context = await browser.newContext({ viewport: { width: 1120, height: 790 } });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', (error) => errors.push(String(error)));
+try {
+  await page.goto('http://127.0.0.1:1420/?preview=1');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const library = page.locator('.model-library');
+  await expect(library.getByText('Whisper Tiny English', { exact: true })).toBeVisible();
+  await library.getByRole('heading', { name: 'Models', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: new URL('available.png', output).pathname.replace(/^\/(\w:)/, '$1') });
+  const tiny = library.locator('li').filter({ hasText: 'Whisper Tiny English' });
+  await tiny.getByRole('button', { name: 'Download', exact: true }).click();
+  await library.getByRole('button', { name: 'Cancel download', exact: true }).click();
+  await expect(library.getByText(/Download cancelled/)).toBeVisible();
+  await tiny.getByRole('button', { name: 'Download', exact: true }).click();
+  await expect(tiny.getByRole('button', { name: 'Use model', exact: true })).toBeVisible();
+  await tiny.getByRole('button', { name: 'Use model', exact: true }).click();
+  await expect(tiny.getByText('Whisper Tiny English · Selected', { exact: true })).toBeVisible();
+  await library.getByRole('button', { name: 'Installed', exact: true }).click();
+  await tiny.getByRole('button', { name: 'Delete', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText(/Dictation will pause/)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Delete model files', exact: true }).click();
+  await expect(library.getByText(/No model selected/)).toBeVisible();
+  await expect(tiny).toHaveCount(0);
+  const axe = await new AxeBuilder({ page }).include('.model-library').analyze();
+  const serious = axe.violations.filter((v) => ['critical', 'serious'].includes(v.impact));
+  if (serious.length) throw new Error(JSON.stringify(serious.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) }))));
+  await page.setViewportSize({ width: 800, height: 560 });
+  await library.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: new URL('installed-compact.png', output).pathname.replace(/^\/(\w:)/, '$1') });
+  const overflow = await library.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+  expect(overflow).toBe(false);
+  await page.goto('http://127.0.0.1:1420/?preview=1&state=delivery');
+  await expect(page.getByText('Text needs insertion', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Paste to previous app' })).toBeVisible();
+  await page.getByRole('button', { name: 'Paste to previous app' }).click();
+  await expect(page.getByText('Text needs insertion', { exact: true })).toHaveCount(0);
+  await page.goto('http://127.0.0.1:1420/?surface=island&preview=1&state=delivery');
+  await page.waitForTimeout(1300);
+  await expect(page.getByRole('button', { name: /Text needs insertion/ })).toBeVisible();
+  await page.screenshot({ path: new URL('persistent-recovery.png', output).pathname.replace(/^\/(\w:)/, '$1') });
+  expect(errors).toEqual([]);
+  await writeFile(new URL('report.json', output), JSON.stringify({ passed: true, checks: ['download', 'cancel', 'select', 'delete selected model', 'clipboard recovery', 'persistent island', '800px layout', 'serious/critical accessibility'], errors }, null, 2));
+  console.log('Model library and delivery UI checks passed. Screenshots: build/model-library-review');
+} finally {
+  await browser.close();
+}

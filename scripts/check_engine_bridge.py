@@ -129,6 +129,16 @@ def main():
             pass
         else:
             raise AssertionError('Acceptance profile accessed credentials')
+        library = client.request('models.list')
+        assert len(library['models']) >= 8, 'Bundled model catalog is incomplete'
+        assert not any(model['installed'] for model in library['models']), 'Acceptance profile discovered user model caches'
+        for action in ('models.download', 'models.select', 'models.delete'):
+            try:
+                client.request(action, id='nemotron-q8', allowShared=True)
+            except RuntimeError as exc:
+                assert 'disabled' in str(exc), str(exc)
+            else:
+                raise AssertionError('Acceptance profile could change user model files')
     finally:
         client.close()
     restarted = Client(command, profile)
@@ -152,7 +162,7 @@ def main():
     recovered = Client(command, damaged_profile)
     try:
         state = recovered.request('bootstrap')
-        assert state['settings']['config_version'] == 7
+        assert state['settings']['config_version'] == 8
         assert not state['settings']['onboarding_completed']
         assert list(damaged_profile.glob('config.unreadable.*.json'))
     finally:

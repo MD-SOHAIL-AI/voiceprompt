@@ -42,6 +42,11 @@ main. See [update setup and release instructions](docs/app-updates.md).
 
 ## Voice typing
 
+The current source adds a downloadable model library and persistent insertion
+recovery. See [model library and recovery](docs/model-library.md) for operation,
+catalog publication, and verification limits. These changes are not yet part of
+the published 0.6.3 installer linked above.
+
 In **Settings → Appearance**, choose Light, Dark, or System brightness and a
 Black, Forest, Graphite, Ocean, Lavender, or Sand color theme. Black is the default. Changes save automatically
 and update both windows. **Show floating island** hides or reveals it;

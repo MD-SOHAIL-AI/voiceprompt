@@ -29,7 +29,9 @@ def run_worker(handle: int):
         install_progress_reporting(report)
         if settings.backend == "nemotron":
             from voiceprompt.nemotron import NemotronTranscriber
-            backend = NemotronTranscriber(settings.nemotron_device)
+            directory = getattr(settings, 'model_directory', '')
+            backend = NemotronTranscriber(settings.nemotron_device,
+                str(Path(directory) / 'nemotron-speech-streaming-en-0.6b.q8_0.gguf') if directory else '')
         else:
             from voiceprompt.transcriber import create_transcriber
             backend = create_transcriber(settings)

@@ -14,6 +14,8 @@ const hub = {
   notifications: [{ id: "a", revision: 0, presented_revision: -1 }],
 } as HubSnapshot;
 describe("island interaction priority", () => {
+  it("keeps uninserted text visible after recording finishes", () =>
+    expect(islandKind({ ...runtime, deliveryPending: true }, null)).toBe("delivery"));
   it("keeps waveform ahead of timer and reminders", () =>
     expect(islandKind({ ...runtime, recording: true }, hub)).toBe("recording"));
   it("returns to focus before next alarm", () =>

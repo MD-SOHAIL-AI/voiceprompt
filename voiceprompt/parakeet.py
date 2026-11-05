@@ -71,8 +71,9 @@ class ParakeetTranscriber:
     backend_name = "parakeet"
     streaming = True  # Phrase processing, rather than a native streaming encoder.
 
-    def __init__(self, cpu_threads: int = 4) -> None:
+    def __init__(self, cpu_threads: int = 4, model_directory: str = '') -> None:
         self.cpu_threads = cpu_threads
+        self.model_directory = model_directory
         self.loaded_model = ""
         self.fallback_reason = ""
         self._recognizer = None
@@ -88,7 +89,7 @@ class ParakeetTranscriber:
         if self._recognizer is None:
             import sherpa_onnx
 
-            files = model_files()
+            files = {name: Path(self.model_directory) / name for name in MODEL_FILES} if self.model_directory else model_files()
             detector = str(vad_file())
             recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(
                 encoder=str(files["encoder.int8.onnx"]), decoder=str(files["decoder.int8.onnx"]),

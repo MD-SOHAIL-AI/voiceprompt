@@ -118,12 +118,14 @@ class ReplayRecorder:
         self.host_api = "WAV replay"
         self._stop = threading.Event()
         self._thread = None
+        self._captured_samples = 0
 
     def prepare(self) -> None:
         pass
 
     def start(self) -> None:
         self.is_recording = True
+        self._captured_samples = 0
         self._thread = threading.Thread(target=self._feed, daemon=True)
         self._thread.start()
 
@@ -133,13 +135,16 @@ class ReplayRecorder:
         for offset in range(0, len(self.audio), size):
             if self._stop.is_set():
                 return
-            self.on_audio_chunk(self.audio[offset:offset + size], self.sample_rate)
+            chunk = self.audio[offset:offset + size]
+            self._captured_samples += len(chunk)
+            self.on_audio_chunk(chunk, self.sample_rate)
             if self._stop.wait(max(0, started + min(offset + size, len(self.audio)) / self.sample_rate - time.perf_counter())):
                 return
         self.session.request_release()
         for _ in range(9):
             if self._stop.is_set():
                 return
+            self._captured_samples += size
             self.on_audio_chunk(np.zeros(size, dtype=np.float32), self.sample_rate)
             if self._stop.wait(0.02):
                 return
@@ -151,7 +156,10 @@ class ReplayRecorder:
         if self._thread:
             self._thread.join(timeout=1)
         self.is_recording = False
-        return Recording(self.audio, self.sample_rate, len(self.audio) / self.sample_rate)
+        captured = self.audio[:self._captured_samples]
+        if self._captured_samples > len(captured):
+            captured = np.pad(captured, (0, self._captured_samples - len(captured)))
+        return Recording(captured, self.sample_rate, self._captured_samples / self.sample_rate)
 
 
 def load_manifest(path: Path) -> list[dict]:

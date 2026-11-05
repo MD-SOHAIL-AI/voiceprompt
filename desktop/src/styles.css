@@ -1854,3 +1854,18 @@ html[data-island-translucent="true"] .island-frame a {
     scroll-behavior: auto !important;
   }
 }
+.section-actions { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.section-actions p { margin: 6px 0 14px; }
+.model-list { list-style: none; padding: 0; margin: 16px 0; }
+.model-list > li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.model-description { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+.model-description p { margin: 5px 0; }
+.model-description small { display: block; }
+.model-progress { display: grid; gap: 10px; margin: 16px 0; }
+.model-progress progress { width: 100%; accent-color: var(--accent); }
+.model-progress .button { justify-self: start; }
+.delivery-notice { margin: 16px 0 10px; padding: 14px; border: 1px solid var(--border); border-radius: 6px; }
+.delivery-notice p { margin: 6px 0 0; }
+.delivery-actions { margin-top: 12px; }
+.form-error { color: var(--danger); }
+.model-library .button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }

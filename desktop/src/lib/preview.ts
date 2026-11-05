@@ -1,11 +1,13 @@
 /** Explicit, in-memory design preview. Never used by the native application. */
 import type { Bootstrap, HubSnapshot, Notice, Settings, Timer } from "../types";
+import bundledModels from "../../../voiceprompt/assets/model-catalog.json";
 const now = () => Date.now() / 1000;
 const id = () => crypto.randomUUID();
 const settings: Settings = {
-  config_version: 7,
+  config_version: 8,
   onboarding_completed: true,
   backend: "whisper",
+  selected_model_id: "whisper-base-en",
   nemotron_device: "vulkan",
   streaming_model: "tiny",
   cpu_threads: 4,
@@ -118,6 +120,22 @@ const value: Bootstrap = {
   ],
 };
 const state = new URLSearchParams(location.search).get("state");
+const sampleModels = bundledModels.models.map((model) => ({
+  ...model, installed: model.id === "whisper-base-en", ownership: model.id === "whisper-base-en" ? "owned" : null,
+  compatible: true, downloadBytes: model.files.reduce((sum, file) => sum + file.size, 0),
+}));
+let modelOperation: Record<string, unknown> = { state: "idle" };
+let modelDownload = 0;
+const catalogStatus = { enabled: true, last_checked: 0, message: "Sample model library. No files are downloaded in this preview." };
+if (state === "delivery") {
+  value.runtime.latestText = "This complete transcript needs to be inserted into the previous application.";
+  value.runtime.insertionStatus = "copy";
+  value.runtime.deliveryPending = true;
+  value.runtime.deliverySessionId = 1;
+  value.runtime.canPastePrevious = true;
+  value.runtime.insertionReason = "focus_changed";
+  value.runtime.detail = "The active window changed. Use Paste to previous app or Copy.";
+}
 if (state === "recording") {
   value.runtime.status = "recording";
   value.runtime.recording =
@@ -214,6 +232,43 @@ export async function previewRequest(
   method: string,
   p: Record<string, unknown>,
 ): Promise<unknown> {
+  if (method === "models.list") return { models: sampleModels.map((model) => ({ ...model, selected: model.id === settings.selected_model_id, diskBytes: model.installed ? model.downloadBytes : 0 })), operation: structuredClone(modelOperation), catalogVersion: bundledModels.version };
+  if (method === "models.catalog.status" || method === "models.refresh") return structuredClone(catalogStatus);
+  if (method === "models.preferences") { catalogStatus.enabled = Boolean(p.enabled); return structuredClone(catalogStatus); }
+  if (method === "models.download") {
+    const model = sampleModels.find((m) => m.id === p.id);
+    if (!model) throw new Error("Choose a sample model.");
+    const generation = ++modelDownload;
+    modelOperation = { state: "downloading", id: model.id, completed: 0, total: model.downloadBytes };
+    setTimeout(() => {
+      if (generation !== modelDownload) return;
+      model.installed = true; model.ownership = "owned";
+      modelOperation = { state: "complete", id: model.id };
+    }, 1200);
+    return { ok: true };
+  }
+  if (method === "models.cancel") { modelDownload++; modelOperation = { ...modelOperation, state: "cancelled" }; return { ok: true }; }
+  if (method === "models.select") {
+    const model = sampleModels.find((m) => m.id === p.id && m.installed);
+    if (!model) throw new Error("Download the sample model first.");
+    settings.selected_model_id = model.id; settings.backend = model.engine as Settings["backend"];
+    value.runtime.ready = true; value.runtime.status = "ready";
+    return { ok: true };
+  }
+  if (method === "models.delete") {
+    const model = sampleModels.find((m) => m.id === p.id);
+    if (model) {
+      modelOperation = { state: "deleted", id: model.id, freedBytes: model.installed ? model.downloadBytes : 0 };
+      model.installed = false;
+      if (settings.selected_model_id === model.id) { settings.selected_model_id = "none"; value.runtime.ready = false; value.runtime.status = "idle"; }
+    }
+    return { ok: true };
+  }
+  if (method === "dictation.paste" || method === "dictation.dismiss" || method === "clipboard.copy") {
+    value.runtime.deliveryPending = false;
+    value.runtime.insertionStatus = method === "dictation.paste" ? "sent" : "copied";
+    return { ok: true };
+  }
   if (method === "bootstrap") {
     snapshot();
     return structuredClone(value);

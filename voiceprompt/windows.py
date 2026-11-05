@@ -41,6 +41,19 @@ def key_down(hotkey):
     return bool(ctypes.windll.user32.GetAsyncKeyState(keys[hotkey]) & 0x8000) if sys.platform == "win32" else False
 
 
+def restore_destination(handle):
+    """Only called by an explicit user paste action, never by a background job."""
+    if sys.platform != "win32" or not handle or is_voiceprompt_window(handle):
+        return False
+    from ctypes import wintypes
+    user = ctypes.windll.user32
+    if foreground_window() == handle:
+        return True
+    user.IsWindow.argtypes = [wintypes.HWND]
+    user.SetForegroundWindow.argtypes = [wintypes.HWND]
+    return bool(user.IsWindow(handle) and user.SetForegroundWindow(handle))
+
+
 def paste_shortcut():
     """Inject Ctrl+V with the pointer-sized Win32 INPUT layout."""
     from ctypes import wintypes

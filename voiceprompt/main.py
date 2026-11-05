@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, CancelledError
 from dataclasses import replace
 
 from voiceprompt.audio import RNNoise
-from voiceprompt.config import Settings, config_dir, history_path, load_settings, save_settings, validate_settings
+from voiceprompt.config import Settings, config_dir, history_path, load_settings, save_settings, validate_settings, legacy_model_id
 from voiceprompt.diagnostics import Diagnostics
 from voiceprompt.history import TranscriptionHistory
 from voiceprompt.hotkeys import PushToTalkHotkey
@@ -26,7 +26,7 @@ from voiceprompt.ui import FloatingPill, TrayApp
 from voiceprompt.worker import AudioWorkerContext
 from voiceprompt.planner import PlannerService
 from voiceprompt.state import SessionState, StopReason
-from voiceprompt.windows import foreground_window, modifiers_down, is_voiceprompt_window
+from voiceprompt.windows import foreground_window, modifiers_down, is_voiceprompt_window, restore_destination
 from voiceprompt.sounds import SoundFeedback
 
 
@@ -50,6 +50,12 @@ class VoicePromptApp:
         self.detail = "Prepare your microphone and model to begin."
         self.latest_text = ""
         self.insertion_status = "none"
+        self.insertion_reason = ""
+        self.delivery_pending = False
+        self._delivery_target = 0
+        self._delivery_session_id = 0
+        self._delivery_text = ""
+        self._recent_audio = None
         self.elapsed_seconds = 0.0
         self.backlog_seconds = 0.0
         self.download_progress = {}
@@ -62,6 +68,7 @@ class VoicePromptApp:
             max_workers=1, thread_name_prefix="dictation", initializer=self._audio_worker.initialize,
         )
         self._working = False
+        self._work_cancel = threading.Event()
         self._ready = False
         self._quitting = False
         self._updating = False
@@ -82,7 +89,10 @@ class VoicePromptApp:
             self._planner_error = f"Planner storage could not open ({type(exc).__name__}). Your existing data has been kept."
         self._planner_ui = None
         self.recorder = self._new_recorder(self.settings)
+        from voiceprompt.model_library import ModelLibrary
+        self.models = ModelLibrary(config_dir() / 'models/library', busy=lambda: self._working or self._quitting)
         self.transcriber = create_transcriber(self.settings)
+        self._asset_identity = None
         self.injector = TextInjector(preserve_clipboard=self.settings.preserve_clipboard)
         self.history = TranscriptionHistory(history_path(), limit=self.settings.max_history)
         try:
@@ -107,7 +117,8 @@ class VoicePromptApp:
             on_planner=self.open_planner,
             controller=self,
         )
-        if (self.settings.preload_model and self.settings.onboarding_completed) if preload_model is None else preload_model:
+        should_preload = (self.settings.preload_model and self.settings.onboarding_completed) if preload_model is None else preload_model
+        if should_preload and self.settings.selected_model_id != 'none':
             self.preload_model()
 
     def run(self) -> None:
@@ -144,6 +155,8 @@ class VoicePromptApp:
                 self._session.request_release(StopReason.CANCELLED)
         self.transcriber.interrupt()
         self._failed_audio = None
+        self._recent_audio = None
+        self.models.close()
         self.hotkey.stop()
         self.tray.stop()
         if self.planner is not None:
@@ -164,6 +177,9 @@ class VoicePromptApp:
                 raise ValueError("Finish recording, recognition and model preparation before restarting to update.")
             if self._failed_audio is not None:
                 raise ValueError("Recover or discard your retained recording before restarting to update.")
+            models = getattr(self, 'models', None)
+            if models and models.thread and models.thread.is_alive():
+                raise ValueError('Finish or cancel the model download before restarting to update.')
             if self.insertion_status == "pending" or self._pending_settings is not None:
                 raise ValueError("Wait for your text and saved settings before restarting to update.")
             self._updating = True
@@ -212,6 +228,7 @@ class VoicePromptApp:
 
     def _begin_work(self) -> int:
         self._working = True
+        self._work_cancel.clear()
         self._work_started_at = time.perf_counter()
         self._current_id += 1
         return self._current_id
@@ -248,9 +265,81 @@ class VoicePromptApp:
             self.set_status("loading model", sid)
             self._submit_work(sid, self._preload_worker, sid)
 
+    def select_model(self, model_id):
+        with self._control:
+            if self._working or self._updating or self._quitting:
+                raise ValueError('Finish the current operation before changing models.')
+            self.models.model(model_id)
+            sid = self._begin_work()
+            self.last_error = ''
+            self.set_status('loading model', sid)
+            self.detail = 'Verifying and preparing the selected model…'
+            self._preparation_cancelled = False
+            self._submit_work(sid, self._select_model_worker, model_id, sid)
+
+    def _select_model_worker(self, model_id, sid):
+        old = copy.deepcopy(self.settings)
+        try:
+            model = self.models.model(model_id)
+            selected = replace(old, selected_model_id=model_id, backend=model['engine'])
+            if model['engine'] == 'whisper': selected.model = model['variant']
+            if model['engine'] == 'moonshine': selected.streaming_model = model['variant']
+            self.models.runtime_settings(selected, verify=True)
+            self._ready = False
+            self.settings = selected
+            self._asset_identity = None
+            self._prepare()
+            save_settings(selected)
+            self._desired_settings = copy.deepcopy(selected)
+            self.last_error = ''
+            self.detail = 'Model ready. Hold your recording key to dictate.'
+        except Exception as exc:
+            self.transcriber.close()
+            self.settings = old
+            self._desired_settings = copy.deepcopy(old)
+            self.transcriber = create_transcriber(old)
+            self._asset_identity = None
+            self._ready = False
+            self._record_error(exc)
+        finally:
+            self._complete_work(sid)
+
+    def delete_model(self, model_id, *, allow_shared=False):
+        with self._control:
+            if self._working or self._updating or self._quitting:
+                raise ValueError('Finish recording and preparation before deleting a model.')
+            model = self.models.model(model_id)
+            selected = self.settings.selected_model_id == model_id
+            if selected:
+                self.transcriber.close()
+                self._ready = False
+                self._asset_identity = None
+            try:
+                freed = self.models.delete(model_id, allow_shared=allow_shared)
+            except Exception:
+                if selected:
+                    self.detail = 'Deletion did not finish. Prepare the current model to use it again.'
+                    self.set_status('idle')
+                raise
+            if selected:
+                settings = replace(self.settings, selected_model_id='none')
+                save_settings(settings)
+                self.settings = settings
+                self._desired_settings = copy.deepcopy(settings)
+                self.last_error = ''
+                self.detail = 'Model deleted. Download and select a model in Settings → Models to dictate.'
+                self.set_status('idle')
+            return freed
+
     def _prepare(self) -> None:
         if self._preparation_cancelled or self._quitting:
             raise RuntimeError("Preparation cancelled. Select Prepare to try again.")
+        runtime = self.models.runtime_settings(self.settings, verify=True)
+        identity = self._model_identity(runtime)
+        if identity != self._asset_identity:
+            self.transcriber.close()
+            self.transcriber = create_transcriber(runtime)
+            self._asset_identity = identity
         self.transcriber.progress = self._download_progress
         self.transcriber.preload()
         if self._preparation_cancelled or self._quitting:
@@ -259,6 +348,11 @@ class VoicePromptApp:
         if self.settings.noise_suppression:
             RNNoise().close()
         self._ready = True
+
+    @staticmethod
+    def _model_identity(runtime):
+        return (runtime.selected_model_id, getattr(runtime, 'model_directory', ''), runtime.nemotron_device,
+                runtime.device, runtime.compute_type, runtime.cpu_threads, runtime.whisper_phrase_decoding)
 
     def _preload_worker(self, sid: int) -> None:
         started = time.perf_counter()
@@ -293,13 +387,17 @@ class VoicePromptApp:
             sid = self._begin_work()
             self.last_error = ""
             self._failed_audio = None
+            self._recent_audio = None
             self.insertion_status = "pending"
+            self.insertion_reason = ""
+            self.delivery_pending = False
             self.elapsed_seconds = self.backlog_seconds = 0.0
             session = DictationSession(sid)
             session.target_window = foreground_window()
             if is_voiceprompt_window(session.target_window):
                 session.target_window = 0
             self._session = session
+            self._recovery_target = session.target_window
             self.sounds.stop()  # Do not capture a reminder that was already playing.
             settings = copy.deepcopy(self.settings)
             self.detail = "Starting microphone…"
@@ -346,6 +444,10 @@ class VoicePromptApp:
                     return
                 if text.strip():
                     self.latest_text = text
+                    self._delivery_text = text
+                    self._delivery_target = session.target_window
+                    self._delivery_session_id = sid
+                    self._recent_audio = session.audio_queue.retained() or None
                     self._save_history(text, duration, source)
             if text.strip() and settings.paste_injection:
                 self.detail = "Release the recording key and any modifiers to finish pasting."
@@ -367,23 +469,30 @@ class VoicePromptApp:
                     try:
                         pasted_at = self.injector.inject(text, target_window=session.target_window,
                             cancelled=lambda: self._quitting or session.cancel.is_set() or sid != self._current_id)
-                    except Exception:
+                    except Exception as exc:
                         outcome = "text"
                         self.insertion_status = "copy"
-                        self.detail = "Automatic paste could not finish. Your text is ready to Copy."
+                        self.insertion_reason = getattr(exc, "reason", "paste_failed")
+                        self.delivery_pending = True
+                        self.detail = str(exc) if getattr(exc, "reason", None) else "Automatic paste could not finish. Try Paste to previous app, or Copy."
                     else:
                         session.metrics["release_to_paste_seconds"] = pasted_at - session.released_at
-                        outcome = "pasted"
-                        self.insertion_status = "pasted"
-                        self.detail = "Text pasted. Hold your recording key to dictate again."
+                        outcome = "paste_sent"
+                        self.insertion_status = "sent"
+                        self.detail = "Paste sent. If text is missing, use Paste to previous app or Copy."
                 else:
                     outcome = "text"
                     self.insertion_status = "copy"
-                    self.detail = ("Text ready. Release your modifiers and use Copy to insert it." if not modifiers_released else
-                                   "Text ready. The active window changed; use Copy to insert it where you want.")
+                    self.insertion_reason = "modifier_held" if not modifiers_released else "no_destination" if not session.target_window else "focus_changed"
+                    self.delivery_pending = True
+                    self.detail = ("Text ready. Release your modifiers and use Paste to previous app or Copy." if not modifiers_released else
+                                   "Text ready. Start dictation with the cursor in another application to paste automatically; use Copy for this transcript." if not session.target_window else
+                                   "Text ready. The active window changed; use Paste to previous app or Copy.")
             else:
                 outcome = "text" if text.strip() else "empty"
                 self.insertion_status = "copy" if text.strip() else "none"
+                self.insertion_reason = "manual_mode" if text.strip() else "no_speech"
+                self.delivery_pending = bool(text.strip())
                 self.detail = "Text ready to copy." if text.strip() else "No speech detected. Check your microphone and try again."
             self.last_error = ""
             if session.stop_reason == StopReason.DURATION_LIMIT:
@@ -405,6 +514,8 @@ class VoicePromptApp:
             if not isinstance(exc, IncompleteRecording) or session.stop_reason in {StopReason.RECOGNITION_FAILED, StopReason.TIMEOUT}:
                 self._ready = False
         finally:
+            session.metrics['insertion_reason'] = self.insertion_reason
+            session.metrics['target_known'] = bool(session.target_window)
             self._record_metrics(
                 "dictation", session_id=sid, backend=self.transcriber.backend_name,
                 model=self.transcriber.loaded_model, noise_suppression=settings.noise_suppression,
@@ -454,6 +565,9 @@ class VoicePromptApp:
             if self._quitting or sid != self._current_id:
                 return
             self._working = False
+            if self.insertion_status == "pending":
+                self.insertion_status = "failed" if self.last_error else "cancelled"
+                self.insertion_reason = "recognition_failed" if self.last_error else "cancelled"
             self._session = None
             pending, self._pending_settings = self._pending_settings, None
             if pending is not None:
@@ -463,6 +577,7 @@ class VoicePromptApp:
 
     def cancel_current(self):
         with self._control:
+            self._work_cancel.set()
             self._ready = False  # Interrupt destroys the loaded speech worker.
             if self._session is not None:
                 self._session.cancel.set()
@@ -479,17 +594,22 @@ class VoicePromptApp:
             if self._working:
                 raise ValueError("Cancel the current operation before discarding a recording.")
             self._failed_audio = None
+            self._recent_audio = None
+            if self.insertion_status == "pending":
+                self.insertion_status = "none"
             self.last_error = ""
             self.detail = "Recording discarded. Prepare the model or start a new recording."
             self.set_status("ready" if self._ready else "idle")
 
-    def retry_failed(self):
+    def retry_failed(self, *, recent=False):
         with self._control:
-            if self._working or self._quitting or self._updating or not self._failed_audio:
+            audio = self._recent_audio if recent else self._failed_audio
+            if self._working or self._quitting or self._updating or not audio:
                 return
             sid = self._begin_work()
-            chunks = self._failed_audio
+            chunks = audio
             session = DictationSession(sid)
+            session.target_window = getattr(self, '_recovery_target', 0)
             # Publish the session before submitting work so an immediate Cancel
             # cannot miss the replay and accidentally accept its transcript.
             self._session = session
@@ -504,7 +624,7 @@ class VoicePromptApp:
         try:
             if session.cancel.is_set() or self._quitting:
                 return
-            self.transcriber.preload()
+            self._prepare()
             text, duration = session.run(ReplayRecorder(chunks, session), self.transcriber,
                                          hotwords=self._hotwords(self.settings), noise_suppression=self.settings.noise_suppression)
             text = apply_replacements(text, self.settings.replacements)
@@ -514,8 +634,14 @@ class VoicePromptApp:
                     self.insertion_status = "copy" if text.strip() else "none"
                     if text.strip():
                         self.latest_text = text
+                        self._delivery_text = text
+                        self._delivery_target = session.target_window
+                        self._delivery_session_id = sid
+                        self.delivery_pending = True
+                        self.insertion_reason = "recovered"
                         self._save_history(text, duration, self.transcriber.backend_name)
                         self._failed_audio = None
+                        self._recent_audio = chunks
                     self.detail = "Recording recovered. Use Copy to insert the text." if text.strip() else "No speech recognized. Your recording is still available to retry or discard."
             if not session.cancel.is_set() and not self._quitting:
                 # Replay loads the model; capture must also be valid before Ready.
@@ -527,6 +653,40 @@ class VoicePromptApp:
                 self._record_error(exc)
         finally:
             self._record_metrics("retry", session_id=sid, **session.metrics)
+            self._complete_work(sid)
+
+    def paste_result(self, session_id, *, replace_clipboard=False):
+        with self._control:
+            if self._working or self._quitting or self._updating:
+                raise ValueError("Finish the current operation before pasting.")
+            if session_id != self._delivery_session_id or not self._delivery_text:
+                raise ValueError("This transcript was replaced. Use the current transcript instead.")
+            target, text = self._delivery_target, self._delivery_text
+            if not target or not restore_destination(target):
+                raise ValueError("The previous destination is unavailable. Use Copy and choose a text field.")
+            sid = self._begin_work()
+            self.insertion_status = "pending"
+            self._submit_work(sid, self._paste_result_worker, sid, target, text, replace_clipboard)
+
+    def _paste_result_worker(self, sid, target, text, replace_clipboard):
+        try:
+            deadline = time.monotonic() + 2
+            while modifiers_down() and time.monotonic() < deadline:
+                if self._work_cancel.wait(.02):
+                    raise RuntimeError('Paste cancelled.')
+            self.injector.inject(text, target_window=target,
+                cancelled=lambda: self._quitting or self._work_cancel.is_set() or sid != self._current_id,
+                replace_clipboard=replace_clipboard)
+            self.insertion_status = "sent"
+            self.insertion_reason = ""
+            self.delivery_pending = False
+            self.detail = "Paste sent. Check the destination before sending it again."
+        except Exception as exc:
+            self.insertion_status = "copy"
+            self.insertion_reason = getattr(exc, "reason", "paste_failed")
+            self.delivery_pending = True
+            self.detail = str(exc)
+        finally:
             self._complete_work(sid)
 
     def _save_history(self, text, duration, source):
@@ -548,6 +708,10 @@ class VoicePromptApp:
             process = getattr(self.transcriber, "_process", None)
             metrics.update(memory_metrics(getattr(process, "pid", 0)))
             self.diagnostics.record(event, **metrics)
+            try:
+                self.models.observe(self.settings.selected_model_id, metrics)
+            except (OSError, ValueError):
+                pass  # Optional model measurements never block dictation.
         except Exception:
             # Diagnostics must never hold the recording state or retain resources.
             logging.getLogger(__name__).warning("Performance diagnostics are unavailable")
@@ -626,7 +790,9 @@ class VoicePromptApp:
     def _apply_settings_worker(self, settings: Settings, sid: int, revision=None) -> None:
         try:
             old = self.settings
-            settings.config_version = 7
+            settings.config_version = 8
+            if (settings.backend, settings.model, settings.streaming_model) != (old.backend, old.model, old.streaming_model) and settings.selected_model_id == old.selected_model_id:
+                settings.selected_model_id = legacy_model_id(settings)
             if settings.backend in {"moonshine", "parakeet", "nemotron"}:
                 settings.language = "en"
             settings.pill_position_x = old.pill_position_x
@@ -637,13 +803,16 @@ class VoicePromptApp:
                 "backend", "model", "streaming_model", "device", "compute_type", "cpu_threads",
                 "nemotron_device",
                 "whisper_phrase_decoding",
+                "selected_model_id",
             ))
             capture_changed = any(getattr(old, k) != getattr(settings, k) for k in (
                 "microphone", "capture_mode", "noise_suppression",
             ))
             if model_changed:
                 self.transcriber.close()
-                self.transcriber = create_transcriber(settings)
+                runtime = self.models.runtime_settings(settings) if settings.selected_model_id != 'none' else settings
+                self.transcriber = create_transcriber(runtime)
+                self._asset_identity = self._model_identity(runtime)
                 self._ready = False
             elif settings.backend == "whisper":
                 self.transcriber.update_options(settings.language, settings.beam_size, settings.vad_filter)
@@ -663,7 +832,7 @@ class VoicePromptApp:
                 self.hotkey = self._new_hotkey(settings)
                 if not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
                     self.hotkey.start()
-            if (settings.preload_model or self._ready) and not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
+            if settings.selected_model_id != 'none' and (settings.preload_model or self._ready) and not os.environ.get("VOICEPROMPT_ACCEPTANCE_DIR"):
                 self._prepare()
             self.last_error = ""
         except Exception as exc:

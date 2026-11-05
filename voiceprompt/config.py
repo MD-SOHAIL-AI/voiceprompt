@@ -28,7 +28,8 @@ BALANCED_MODEL = "Systran/faster-distil-whisper-small.en"
 
 @dataclass
 class Settings:
-    config_version: int = 7
+    config_version: int = 8
+    selected_model_id: str = "whisper-base-en"
     onboarding_completed: bool = False
     backend: str = "whisper"
     nemotron_device: str = "vulkan"
@@ -100,9 +101,9 @@ def load_settings(path: Path | None = None, *, migration_backup=True) -> Setting
     if not isinstance(data, dict):
         raise ValueError("VoicePrompt settings must be an object. Your original file has been kept.")
     version = data.get("config_version", 0)
-    if type(version) is not int or not 0 <= version <= 7:
+    if type(version) is not int or not 0 <= version <= 8:
         raise ValueError("These settings need a newer version of VoicePrompt. Your data has been kept.")
-    if version < 7 and migration_backup:
+    if version < 8 and migration_backup:
         backup = path.with_suffix(f".v{version}.bak")
         if not backup.exists():
             shutil.copy2(path, backup)
@@ -119,7 +120,7 @@ def load_settings(path: Path | None = None, *, migration_backup=True) -> Setting
     settings.onboarding_completed = data.get("onboarding_completed", True) is True
     if not isinstance(settings.sound_feedback, bool):
         settings.sound_feedback = True
-    settings.config_version = 7
+    settings.config_version = 8
     if settings.hotkey not in {"right_ctrl", "left_ctrl", "right_alt", "left_alt", "f8", "f9"}:
         settings.hotkey = "right_ctrl"
     if settings.recording_mode not in {"ptt", "toggle"}:
@@ -156,6 +157,8 @@ def load_settings(path: Path | None = None, *, migration_backup=True) -> Setting
     for source, target in DEFAULT_REPLACEMENTS.items():
         normalized_replacements.setdefault(source, target)
     settings.replacements = normalized_replacements
+    if 'selected_model_id' not in data:
+        settings.selected_model_id = legacy_model_id(settings)
     return validate_settings(settings, {})
 
 
@@ -192,6 +195,8 @@ def validate_settings(settings: Settings, updates: dict) -> Settings:
     if not isinstance(updates, dict) or set(updates) - set(asdict(Settings())):
         raise ValueError("Unsupported setting.")
     result = replace(settings, **updates)
+    if 'selected_model_id' not in updates and any(key in updates for key in ('backend', 'model', 'streaming_model')):
+        result.selected_model_id = legacy_model_id(result)
     for name, default in asdict(Settings()).items():
         value = getattr(result, name)
         if isinstance(default, bool) and type(value) is not bool:
@@ -208,7 +213,7 @@ def validate_settings(settings: Settings, updates: dict) -> Settings:
     for name, allowed in choices.items():
         if getattr(result, name) not in allowed:
             raise ValueError(f"Choose a supported {name.replace('_', ' ')}.")
-    for name, low, high in (("config_version", 7, 7), ("cpu_threads", 1, 12), ("beam_size", 1, 10),
+    for name, low, high in (("config_version", 8, 8), ("cpu_threads", 1, 12), ("beam_size", 1, 10),
                              ("max_history", 0, 500), ("pill_position_x", -100000, 100000), ("pill_position_y", -100000, 100000)):
         value = getattr(result, name)
         if type(value) is not int or not low <= value <= high:
@@ -220,3 +225,14 @@ def validate_settings(settings: Settings, updates: dict) -> Settings:
     if len(json.dumps(asdict(result), ensure_ascii=False).encode("utf-8")) > 128000:
         raise ValueError("Settings exceed the safe storage size. Shorten the custom dictionary.")
     return result
+
+
+def legacy_model_id(settings):
+    if settings.backend == 'nemotron':
+        return 'nemotron-q8'
+    if settings.backend == 'parakeet':
+        return 'parakeet-v2-int8'
+    if settings.backend == 'moonshine':
+        return 'moonshine-' + settings.streaming_model
+    return {'base.en': 'whisper-base-en', 'tiny.en': 'whisper-tiny-en', 'small': 'whisper-small',
+            BALANCED_MODEL: 'whisper-distil-small-en'}.get(settings.model, 'legacy')

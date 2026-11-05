@@ -1,0 +1,379 @@
+{
+  "schema": 1,
+  "version": 1,
+  "models": [
+    {
+      "id": "whisper-tiny-en",
+      "name": "Whisper Tiny English",
+      "engine": "whisper",
+      "variant": "tiny.en",
+      "revision": "0d3d19a32d3338f10357c0889762bd8d64bbdeba",
+      "repo": "Systran/faster-whisper-tiny.en",
+      "languages": [
+        "en"
+      ],
+      "license": "MIT",
+      "source": "https://huggingface.co/Systran/faster-whisper-tiny.en",
+      "files": [
+        {
+          "name": "config.json",
+          "url": "https://huggingface.co/Systran/faster-whisper-tiny.en/resolve/0d3d19a32d3338f10357c0889762bd8d64bbdeba/config.json",
+          "size": 2317,
+          "sha256": "14b1b421a90349bc551b881461426b561a874049cb9e4c4864f2ca384f6a7cc5"
+        },
+        {
+          "name": "model.bin",
+          "url": "https://huggingface.co/Systran/faster-whisper-tiny.en/resolve/0d3d19a32d3338f10357c0889762bd8d64bbdeba/model.bin",
+          "size": 75537502,
+          "sha256": "1a5afae06a4db91c975c9a9d78be5cc110ee4ea022ad57d55492e4550e936b2a"
+        },
+        {
+          "name": "tokenizer.json",
+          "url": "https://huggingface.co/Systran/faster-whisper-tiny.en/resolve/0d3d19a32d3338f10357c0889762bd8d64bbdeba/tokenizer.json",
+          "size": 2128466,
+          "sha256": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df"
+        },
+        {
+          "name": "vocabulary.txt",
+          "url": "https://huggingface.co/Systran/faster-whisper-tiny.en/resolve/0d3d19a32d3338f10357c0889762bd8d64bbdeba/vocabulary.txt",
+          "size": 422309,
+          "sha256": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    },
+    {
+      "id": "whisper-base-en",
+      "name": "Whisper Base English",
+      "engine": "whisper",
+      "variant": "base.en",
+      "revision": "3d3d5dee26484f91867d81cb899cfcf72b96be6c",
+      "repo": "Systran/faster-whisper-base.en",
+      "languages": [
+        "en"
+      ],
+      "license": "MIT",
+      "source": "https://huggingface.co/Systran/faster-whisper-base.en",
+      "files": [
+        {
+          "name": "config.json",
+          "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/3d3d5dee26484f91867d81cb899cfcf72b96be6c/config.json",
+          "size": 2227,
+          "sha256": "f3bc3821e9fc76a27bae538e11ae5b677dcdd352b4600429ce7951d398569aeb"
+        },
+        {
+          "name": "model.bin",
+          "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/3d3d5dee26484f91867d81cb899cfcf72b96be6c/model.bin",
+          "size": 145216508,
+          "sha256": "2a166925539a16005f14ff328359f9b9adb9dc4fb631bb3b227526862e93e2ef"
+        },
+        {
+          "name": "tokenizer.json",
+          "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/3d3d5dee26484f91867d81cb899cfcf72b96be6c/tokenizer.json",
+          "size": 2128466,
+          "sha256": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df"
+        },
+        {
+          "name": "vocabulary.txt",
+          "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/3d3d5dee26484f91867d81cb899cfcf72b96be6c/vocabulary.txt",
+          "size": 422309,
+          "sha256": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    },
+    {
+      "id": "whisper-small",
+      "name": "Whisper Small Multilingual",
+      "engine": "whisper",
+      "variant": "small",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120",
+      "repo": "Systran/faster-whisper-small",
+      "languages": [
+        "multilingual"
+      ],
+      "license": "MIT",
+      "source": "https://huggingface.co/Systran/faster-whisper-small",
+      "files": [
+        {
+          "name": "config.json",
+          "url": "https://huggingface.co/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/config.json",
+          "size": 2370,
+          "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828"
+        },
+        {
+          "name": "model.bin",
+          "url": "https://huggingface.co/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/model.bin",
+          "size": 483546902,
+          "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671"
+        },
+        {
+          "name": "tokenizer.json",
+          "url": "https://huggingface.co/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/tokenizer.json",
+          "size": 2203239,
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+        },
+        {
+          "name": "vocabulary.txt",
+          "url": "https://huggingface.co/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/vocabulary.txt",
+          "size": 459861,
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    },
+    {
+      "id": "whisper-distil-small-en",
+      "name": "Distil Whisper Small English",
+      "engine": "whisper",
+      "variant": "Systran/faster-distil-whisper-small.en",
+      "revision": "ef77d90526ccd62cde3808ee70626a01e5cf83e4",
+      "repo": "Systran/faster-distil-whisper-small.en",
+      "languages": [
+        "en"
+      ],
+      "license": "MIT",
+      "source": "https://huggingface.co/Systran/faster-distil-whisper-small.en",
+      "files": [
+        {
+          "name": "config.json",
+          "url": "https://huggingface.co/Systran/faster-distil-whisper-small.en/resolve/ef77d90526ccd62cde3808ee70626a01e5cf83e4/config.json",
+          "size": 2812,
+          "sha256": "b571ae8022a34c1df50876a65b5f813a5c22e5ee3b87bc0e4db5662dfc9c2c3d"
+        },
+        {
+          "name": "model.bin",
+          "url": "https://huggingface.co/Systran/faster-distil-whisper-small.en/resolve/ef77d90526ccd62cde3808ee70626a01e5cf83e4/model.bin",
+          "size": 332308257,
+          "sha256": "1187de3982cdcf962a2fb8f797e429fb4651b875b18fe9ce50b58b52fc9072b7"
+        },
+        {
+          "name": "preprocessor_config.json",
+          "url": "https://huggingface.co/Systran/faster-distil-whisper-small.en/resolve/ef77d90526ccd62cde3808ee70626a01e5cf83e4/preprocessor_config.json",
+          "size": 339,
+          "sha256": "a6a76d28c93edb273669eb9e0b0636a2bddbb1272c3261e47b7ca6dfdbac1b8d"
+        },
+        {
+          "name": "tokenizer.json",
+          "url": "https://huggingface.co/Systran/faster-distil-whisper-small.en/resolve/ef77d90526ccd62cde3808ee70626a01e5cf83e4/tokenizer.json",
+          "size": 2405466,
+          "sha256": "c9c77688528c0509abbd41873edab16384b8f041531b1d3092ab4d1d83a02a50"
+        },
+        {
+          "name": "vocabulary.json",
+          "url": "https://huggingface.co/Systran/faster-distil-whisper-small.en/resolve/ef77d90526ccd62cde3808ee70626a01e5cf83e4/vocabulary.json",
+          "size": 825480,
+          "sha256": "4dadfee7c4a871665f65c06037f5f5ec893fb2d7f5eb4cf11063618e31dbe11a"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    },
+    {
+      "id": "parakeet-v2-int8",
+      "name": "Parakeet v2 INT8",
+      "engine": "parakeet",
+      "variant": "",
+      "revision": "1ab9323565ddb038682214b292f588070a538ce2",
+      "repo": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+      "languages": [
+        "en"
+      ],
+      "license": "CC-BY-4.0",
+      "source": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+      "files": [
+        {
+          "name": "decoder.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/decoder.int8.onnx",
+          "size": 7257753,
+          "sha256": "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e"
+        },
+        {
+          "name": "encoder.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/encoder.int8.onnx",
+          "size": 652184296,
+          "sha256": "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab"
+        },
+        {
+          "name": "joiner.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/joiner.int8.onnx",
+          "size": 1739080,
+          "sha256": "7946164367946e7f9f29a122407c3252b680dbae9a51343eb2488d057c3c43d2"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/tokens.txt",
+          "size": 9384,
+          "sha256": "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    },
+    {
+      "id": "nemotron-q8",
+      "name": "Nemotron Streaming Q8",
+      "engine": "nemotron",
+      "variant": "",
+      "revision": "ebe59e5a817142986528bbbee5dba8db7b38ed50",
+      "repo": "nvidia/nemotron-speech-streaming-en-0.6b",
+      "languages": [
+        "en"
+      ],
+      "license": "NVIDIA Open Model License",
+      "source": "https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b",
+      "files": [
+        {
+          "name": "nemotron-speech-streaming-en-0.6b.q8_0.gguf",
+          "url": "https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b/resolve/ebe59e5a817142986528bbbee5dba8db7b38ed50/nemotron-speech-streaming-en-0.6b.q8_0.gguf",
+          "size": 699872960,
+          "sha256": "d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    },
+    {
+      "id": "moonshine-tiny",
+      "name": "Moonshine Tiny English",
+      "engine": "moonshine",
+      "variant": "tiny",
+      "revision": "quantized_26_08_21",
+      "languages": [
+        "en"
+      ],
+      "license": "MIT",
+      "source": "https://github.com/moonshine-ai/moonshine",
+      "legacy_url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21",
+      "files": [
+        {
+          "name": "adapter.ort",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/adapter.ort",
+          "size": 1319664,
+          "sha256": "22ecc949e146c49667fda28d102d4e30749a107dc88a396292aa8f277ef1347c"
+        },
+        {
+          "name": "cross_kv.ort",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/cross_kv.ort",
+          "size": 1287544,
+          "sha256": "143a36667b8d05fd9d04e8c337b7ee121f37ef299aea6b3d82bdb3d3401950b4"
+        },
+        {
+          "name": "decoder_kv.ort",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/decoder_kv.ort",
+          "size": 32583720,
+          "sha256": "8852553f312adb6c9aa4d17418015049b30f412209ee569d336548c0044627de"
+        },
+        {
+          "name": "encoder.ort",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/encoder.ort",
+          "size": 7675440,
+          "sha256": "a8414e1a5dedf9f2093d7680601dd8a9b0433e7020260eafe0e370ead91134ca"
+        },
+        {
+          "name": "frontend.model.ort",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/frontend.model.ort",
+          "size": 23344,
+          "sha256": "5121b561417b638afce0c6c31b760e37c93cf97f80d9b0031aad1fe7b6f25d61"
+        },
+        {
+          "name": "frontend.weights.ort",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/frontend.weights.ort",
+          "size": 2093464,
+          "sha256": "217da24ac6f522ebf02da8ef288e77d1ac68d50d4a6821433182e4fbf4204bbd"
+        },
+        {
+          "name": "streaming_config.json",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/streaming_config.json",
+          "size": 509,
+          "sha256": "74fe5ddebd63b17caf59e8a3b18c17547ff7bce1642050edbb1c3962674f8950"
+        },
+        {
+          "name": "tokenizer.bin",
+          "url": "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_08_21/tokenizer.bin",
+          "size": 249974,
+          "sha256": "6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    },
+    {
+      "id": "moonshine-small",
+      "name": "Moonshine Small English",
+      "engine": "moonshine",
+      "variant": "small",
+      "revision": "quantized_26_08_21",
+      "languages": [
+        "en"
+      ],
+      "license": "MIT",
+      "source": "https://github.com/moonshine-ai/moonshine",
+      "legacy_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21",
+      "files": [
+        {
+          "name": "adapter.ort",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/adapter.ort",
+          "size": 2870368,
+          "sha256": "c665f742364febad597cc9ac1e0b341ffbee0e24a1466e2f3bde95e6e4771762"
+        },
+        {
+          "name": "cross_kv.ort",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/cross_kv.ort",
+          "size": 5356536,
+          "sha256": "e2d3417144e9514055ebfefe8dcc4c0a55a55adcb8530435844c75c53e352bf6"
+        },
+        {
+          "name": "decoder_kv.ort",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/decoder_kv.ort",
+          "size": 81878600,
+          "sha256": "1a05465b1dd955858dfcbee039c0020fb5dd982b0f5094c34e61735d518d771b"
+        },
+        {
+          "name": "encoder.ort",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/encoder.ort",
+          "size": 44148576,
+          "sha256": "2d4d973e91e8aca08c51e7e7efa28a46ab265b63d809d5294d18b86bcd85b993"
+        },
+        {
+          "name": "frontend.model.ort",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/frontend.model.ort",
+          "size": 26944,
+          "sha256": "09b1210ae30dc5f0f3e45f0ebab914c254741323114f53fbbe5ae62cca35058f"
+        },
+        {
+          "name": "frontend.weights.ort",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/frontend.weights.ort",
+          "size": 7769464,
+          "sha256": "7ef97521bd4bad3928f5bb6808586f4fcc6e92bd5990394112eed7d4052ec338"
+        },
+        {
+          "name": "streaming_config.json",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/streaming_config.json",
+          "size": 512,
+          "sha256": "26f02b6afb22d60871a5efd85c3d38e569cc0ddb6c5eb6e93d3260152ae8a47a"
+        },
+        {
+          "name": "tokenizer.bin",
+          "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/tokenizer.bin",
+          "size": 249974,
+          "sha256": "6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d"
+        }
+      ],
+      "min_app": "0.6.3",
+      "ram_mb": null,
+      "performance": "Not benchmarked on this computer"
+    }
+  ],
+  "app": "VoicePrompt Models"
+}

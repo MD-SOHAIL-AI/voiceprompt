@@ -1,0 +1,40 @@
+name: Publish reviewed model catalog
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  catalog:
+    runs-on: windows-latest
+    environment: model-catalog
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pip install -r requirements-lock.txt
+      - run: npm ci
+        working-directory: desktop
+      - name: Validate inventory and delivery regressions
+        run: |
+          python -m unittest discover -s tests -p test_model_library.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests -p test_delivery_reliability.py
+      - name: Sign reviewed catalog
+        env:
+          VOICEPROMPT_UPDATE_PRIVATE_KEY: ${{ secrets.VOICEPROMPT_UPDATE_PRIVATE_KEY }}
+          VOICEPROMPT_UPDATE_KEY_PASSWORD: ${{ secrets.VOICEPROMPT_UPDATE_KEY_PASSWORD }}
+        run: python scripts/sign_model_catalog.py
+      - name: Publish catalog independently of app updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view model-catalog --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create model-catalog --repo $env:GITHUB_REPOSITORY --prerelease --latest=false --title 'Supported speech model catalog' --notes 'Reviewed, signed model metadata. Models download only at user request.'
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          gh release upload model-catalog release/model-catalog.json --repo $env:GITHUB_REPOSITORY --clobber

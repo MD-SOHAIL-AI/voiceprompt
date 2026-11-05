@@ -152,10 +152,11 @@ class NemotronTranscriber:
     backend_name = "nemotron"
     streaming = True
 
-    def __init__(self, device: str = "vulkan") -> None:
+    def __init__(self, device: str = "vulkan", model_path: str = '') -> None:
         if device not in {"vulkan", "cpu"}:
             raise ValueError("Nemotron processing must be vulkan or cpu.")
         self.device = device
+        self.model_path = model_path
         self.loaded_model = ""
         self.fallback_reason = ""
         self._api = None
@@ -171,7 +172,7 @@ class NemotronTranscriber:
         try:
             speech = _warmup_audio()
             if self._recognizer is None:
-                weights = model_file()
+                weights = Path(self.model_path) if self.model_path else model_file()
                 self._api = _get_api()
                 try:
                     self._recognizer = self._api.create(weights, self.device)

@@ -10,6 +10,15 @@ from voiceprompt.config import load_settings
 
 
 class ConfigMigrationTests(unittest.TestCase):
+    def test_v7_model_choice_is_preserved_and_backed_up_for_library_migration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.json'
+            original = {'config_version': 7, 'backend': 'nemotron', 'nemotron_device': 'cpu'}
+            path.write_text(json.dumps(original), encoding='utf-8')
+            with patch('voiceprompt.config.config_path', return_value=path): settings = load_settings()
+            self.assertEqual(settings.selected_model_id, 'nemotron-q8')
+            self.assertEqual(settings.nemotron_device, 'cpu')
+            self.assertEqual(json.loads(path.with_suffix('.v7.bak').read_text()), original)
     def test_sound_preference_defaults_on_and_preserves_false(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"
@@ -44,7 +53,7 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertNotIn("God", settings.replacements)
         self.assertEqual(settings.replacements["my project"], "MyProject")
         self.assertNotIn("brahmsulge", settings.replacements)
-        self.assertEqual(settings.config_version, 7)
+        self.assertEqual(settings.config_version, 8)
         self.assertEqual(settings.backend, "whisper")
         self.assertEqual(settings.cpu_threads, 4)
         self.assertFalse(settings.noise_suppression)
@@ -66,7 +75,7 @@ class ConfigMigrationTests(unittest.TestCase):
             path.write_text(json.dumps({"config_version": 3, "backend": "parakeet", "model": "base.en", "beam_size": 3, "language": ""}))
             with patch("voiceprompt.config.config_path", return_value=path):
                 settings = load_settings()
-        self.assertEqual(settings.config_version, 7)
+        self.assertEqual(settings.config_version, 8)
         self.assertEqual(settings.backend, "parakeet")
         self.assertEqual(settings.model, "base.en")
         self.assertEqual(settings.beam_size, 3)

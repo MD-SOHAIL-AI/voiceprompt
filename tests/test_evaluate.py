@@ -8,6 +8,17 @@ from voiceprompt.evaluate import select_candidate, summarize, word_errors
 
 
 class EvaluationTests(unittest.TestCase):
+    def test_replay_accounts_for_every_captured_release_tail_sample(self):
+        import numpy as np
+        from voiceprompt.evaluate import ReplayRecorder
+        from voiceprompt.session import DictationSession
+        replay = ReplayRecorder(np.ones(1600, dtype=np.float32), 16000, DictationSession(1))
+        received = []
+        replay.on_audio_chunk = lambda chunk, rate: received.append(len(chunk))
+        with patch.object(replay._stop, 'wait', return_value=False): replay._feed()
+        recording = replay.stop(grace=False)
+        self.assertEqual(sum(received), len(recording.audio))
+        self.assertEqual(sum(received), round(recording.duration_seconds * 16000))
     def test_word_error_rate_counts_substitutions_deletions_insertions(self):
         self.assertEqual(word_errors("one two three", "one four"), (2, 3))
         self.assertEqual(word_errors("Hello, world!", "hello world"), (0, 2))

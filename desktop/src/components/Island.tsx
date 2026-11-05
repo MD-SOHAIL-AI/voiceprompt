@@ -133,7 +133,7 @@ export function Island() {
       runtime.deferReminders ||
       runtime.error ||
       !runtime.latestText ||
-      !["pasted", "copy"].includes(runtime.insertionStatus)
+      !["sent", "copied"].includes(runtime.insertionStatus)
     )
       return;
     const key = `${runtime.sessionId}:${runtime.latestText}`;
@@ -271,6 +271,7 @@ export function Island() {
         ? `${hub.nextAlarm.title}, ${countdown(hub.nextAlarm.due - hub.now)} until alarm`
         : kind === "recording"
           ? `Listening. ${pending} pending reminders.`
+          : kind === "delivery" ? "Text needs insertion. Open Dictation to paste or copy your transcript."
           : kind === "error"
             ? "VoicePrompt needs attention"
             : pending
@@ -286,6 +287,7 @@ export function Island() {
           aria-label={fullLabel}
           title={`${fullLabel}. Click to open VoicePrompt controls.`}
           onClick={() => {
+            if (kind === "delivery") { void native("open_main", { page: "Dictation" }); return; }
             if (!drag.current?.moved) open();
           }}
           onPointerDown={(event) => {
@@ -310,7 +312,7 @@ export function Island() {
             <>
               <Check size={15} />
               <span>
-                {runtime.insertionStatus === "pasted" ? "Done" : "Copy ready"}
+                {runtime.insertionStatus === "sent" ? "Paste sent" : "Copied"}
               </span>
             </>
           ) : kind === "recording" ? (
@@ -320,6 +322,8 @@ export function Island() {
               <LoaderCircle size={14} className="spin" />
               <span>{kind === "preparing" ? "Preparing" : "Finishing"}</span>
             </>
+          ) : kind === "delivery" ? (
+            <><AlertTriangle size={15} /><span>Text ready</span></>
           ) : kind === "error" ? (
             <>
               <AlertTriangle size={15} />

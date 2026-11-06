@@ -37,7 +37,7 @@ def collect(metadata, output):
             allowed = override.resolve() if source in override_files else folder
             if not source.resolve().is_relative_to(allowed) or not source.is_file():
                 raise ValueError('Unsafe dependency license path: ' + identity)
-            if source in override_files and hashlib.sha256(source.read_bytes()).hexdigest() != provenance.get((identity, source.name)):
+            if source in override_files and hashlib.sha256(source.read_text(encoding='utf-8').encode('utf-8')).hexdigest() != provenance.get((identity, source.name)):
                 raise ValueError('Review the changed upstream license copy: ' + identity)
             relative = source.relative_to(override if source in override_files else folder)
             target = destination / relative

@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -40,6 +41,23 @@ class NativeLicenseTests(unittest.TestCase):
 
     def test_missing_notice_blocks_packaging(self):
         with self.assertRaisesRegex(ValueError,'pin upstream'):
+            self.collect()
+
+    def test_pinned_override_hash_survives_windows_checkout_newlines(self):
+        folder=self.overrides / 'fixture-1.0.0'
+        folder.mkdir()
+        (folder / 'LICENSE').write_bytes(b'License fixture\r\n')
+        record={'package':'fixture-1.0.0','file':'LICENSE','sha256':hashlib.sha256(b'License fixture\n').hexdigest()}
+        (self.overrides / 'SOURCES.json').write_text(json.dumps([record]))
+        self.assertEqual(self.collect(),1)
+
+    def test_changed_override_requires_new_review(self):
+        folder=self.overrides / 'fixture-1.0.0'
+        folder.mkdir()
+        (folder / 'LICENSE').write_text('changed')
+        record={'package':'fixture-1.0.0','file':'LICENSE','sha256':'0'*64}
+        (self.overrides / 'SOURCES.json').write_text(json.dumps([record]))
+        with self.assertRaisesRegex(ValueError,'changed upstream license'):
             self.collect()
 
     def test_license_file_cannot_escape_the_dependency(self):

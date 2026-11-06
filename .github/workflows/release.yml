@@ -91,6 +91,7 @@ jobs:
             build/clipboard-handoff.json
             build/installer-check.json
             build/frozen-smoke.json
+            build/frozen-source-check.json
             build/model-library-review/
             .impeccable/review/*.png
   publish:

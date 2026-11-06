@@ -105,6 +105,7 @@ jobs:
           retention-days: 90
           path: |
             build/frozen-smoke.json
+            build/frozen-source-check.json
             build/frozen-bridge.json
             build/installer-check.json
             build/native-checks.json
@@ -133,9 +134,9 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Select-String -Path pyproject.toml -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
-          if ($version -notmatch '^\d+\.\d+\.\d+(?:-(?:rc|beta|preview)\.[1-9]\d*)?$') { throw 'Invalid preview version.' }
-          $tag = if ($version.Contains('-')) { "v$version" } else { "v$version-beta.1" }
-          $notes = if ($version.Contains('-')) { "docs/release-notes-$version.md" } else { "docs/release-notes-$version-beta.1.md" }
+          if ($version -notmatch '^\d+\.\d+\.\d+-(?:rc|beta|preview)\.[1-9]\d*$') { throw 'Publishing a preview requires an explicit prerelease version.' }
+          $tag = "v$version"
+          $notes = "docs/release-notes-$version.md"
           $installer = "release/VoicePrompt-Setup-$version-x64-unsigned-preview.exe"
           if (-not (Test-Path -LiteralPath $notes) -or -not (Test-Path -LiteralPath $installer)) { throw 'Beta release notes and the verified installer are required.' }
           git merge-base --is-ancestor HEAD origin/main

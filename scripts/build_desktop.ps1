@@ -52,8 +52,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Build versions disagree' }
     & $Python packaging\prepare_build.py
     if ($LASTEXITCODE -ne 0) { throw 'Build preparation failed' }
-    & $Python -m PyInstaller --noconfirm packaging\Engine.spec
+    & $Python -m PyInstaller --clean --noconfirm packaging\Engine.spec
     if ($LASTEXITCODE -ne 0) { throw 'Voice engine packaging failed' }
+    & $Python scripts\check_frozen_sources.py --engine dist\VoicePromptEngine\VoicePromptEngine.exe
+    if ($LASTEXITCODE -ne 0) { throw 'Packaged engine contains stale application code. Rebuild from an unchanged source checkout.' }
     if (-not $nativePath) {
         . (Join-Path $PSScriptRoot 'windows_toolchain.ps1')
         Initialize-VoicePromptToolchain
@@ -68,6 +70,8 @@ try {
     }
     if ((Get-Item -LiteralPath $nativePath).VersionInfo.ProductVersion -ne $version) { throw 'Desktop executable version differs from the release. Rebuild the desktop before packaging.' }
     Assert-VoicePromptProductionShell -Executable $nativePath -ExpectedVersion $version
+    & $Python scripts\collect_native_licenses.py
+    if ($LASTEXITCODE -ne 0) { throw 'Native dependency notice collection failed.' }
     $stage = Join-Path $projectRoot 'dist\VoicePrompt'
     if ([IO.Path]::GetFullPath($stage) -ne (Join-Path $projectRoot 'dist\VoicePrompt')) { throw 'Unexpected stage path' }
     # Existing builds remain intact until both components have built successfully.

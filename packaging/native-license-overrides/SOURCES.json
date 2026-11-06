@@ -1,0 +1,45 @@
+[
+  {
+    "package": "alloc-stdlib-0.3.0",
+    "file": "LICENSE",
+    "upstream": "https://github.com/dropbox/rust-alloc-no-stdlib/blob/0a81fd6928ea3b33c8cd484aa4575d50ffb98012/LICENSE",
+    "sha256": "4d7b6b5698039ac38a4f537c1075a9500afe2986c8be8f794a8c20c6ac72f778"
+  },
+  {
+    "package": "tauri-plugin-2.7.2",
+    "file": "LICENSE-MIT",
+    "upstream": "https://github.com/tauri-apps/tauri/blob/59b63ab500da9859f12d8888c3298bc29bba0b92/LICENSE-MIT",
+    "sha256": "4f11ab0631fbb692369790e50616579407c117c6d4df3de99d399cf433a1ab31"
+  },
+  {
+    "package": "tauri-plugin-2.7.2",
+    "file": "LICENSE-APACHE-2.0",
+    "upstream": "https://github.com/tauri-apps/tauri/blob/59b63ab500da9859f12d8888c3298bc29bba0b92/LICENSE-APACHE-2.0",
+    "sha256": "eb3d7b5485466acbd81f2b496f595ab637d2792e268206b27d99e793bdb67549"
+  },
+  {
+    "package": "webview2-com-0.39.1",
+    "file": "LICENSE",
+    "upstream": "https://github.com/wravery/webview2-rs/blob/edc2caf886175ccaebe86078c9cfe1ae2a187328/LICENSE",
+    "sha256": "f34335e76fc91c0a3ba822e79d136856235694702d4e35b7800c9a091784122d"
+  },
+  {
+    "package": "webview2-com-macros-0.8.1",
+    "file": "LICENSE",
+    "upstream": "https://github.com/wravery/webview2-rs/blob/dffa41a8a46d3f5565eefbff2de57d38d399f158/LICENSE",
+    "sha256": "f34335e76fc91c0a3ba822e79d136856235694702d4e35b7800c9a091784122d"
+  },
+  {
+    "package": "webview2-com-sys-0.39.1",
+    "file": "LICENSE",
+    "upstream": "https://github.com/wravery/webview2-rs/blob/edc2caf886175ccaebe86078c9cfe1ae2a187328/LICENSE",
+    "sha256": "f34335e76fc91c0a3ba822e79d136856235694702d4e35b7800c9a091784122d"
+  },
+  {
+    "package": "selectors-0.38.0",
+    "file": "LICENSE",
+    "upstream": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+    "source": "https://github.com/servo/stylo/tree/572ecba2d1600e7c3d490586692a209faf703baa/selectors",
+    "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+  }
+]

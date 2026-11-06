@@ -58,7 +58,7 @@ class TextInjector:
                     if previous is None:
                         previous = pyperclip.paste()
                 except (RuntimeError, OSError, PyperclipException) as exc:
-                    raise PasteError("clipboard_preservation", "The previous clipboard cannot be preserved. Use Paste and replace clipboard, or Copy.") from exc
+                    raise PasteError("clipboard_preservation", f"{exc} Select Paste and replace clipboard to insert your transcript without restoring the previous clipboard, or use Copy.") from exc
             if cancelled and cancelled():
                 raise PasteError("cancelled", "Paste cancelled.")
             self._lease = None
@@ -80,6 +80,8 @@ class TextInjector:
                     raise PasteError("clipboard_changed", "The clipboard changed before paste. Your transcript is still available.")
                 if modifiers_down():
                     raise PasteError("modifier_held", "Release the recording key and other modifiers, then try Paste again.")
+                if self._lease is not None:
+                    self._lease.arm()
                 paste_shortcut()
             except Exception:
                 if previous is not None and self._owns() and (self._lease is not None or pyperclip.paste() == text):

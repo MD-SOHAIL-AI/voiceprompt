@@ -52,6 +52,8 @@ jobs:
           python -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { throw 'Python regressions failed.' }
           python scripts/check_engine_bridge.py
+      - name: Native clipboard preservation and delivery
+        run: python scripts/check_clipboard_handoff.py --allow-hosted-runner-clipboard
       - name: Frontend checks
         working-directory: desktop
         run: |
@@ -77,6 +79,7 @@ jobs:
             .impeccable/review/*.png
             build/ui-checks.json
             build/python-audit.json
+            build/clipboard-handoff.json
   native-package:
     runs-on: windows-latest
     steps:

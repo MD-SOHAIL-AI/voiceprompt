@@ -9,6 +9,8 @@ import queue
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+MAX_SNAPSHOT_BYTES = 64 * 1024 * 1024
+
 
 def sequence_number():
     return c.windll.user32.GetClipboardSequenceNumber() if sys.platform == "win32" else 0
@@ -43,7 +45,7 @@ def _opened(user):
     if not window: raise ClipboardUnavailable("Clipboard preservation is unavailable. Use Copy.")
     opened=False
     try:
-        deadline=time.monotonic()+.2
+        deadline=time.monotonic()+.6
         while not user.OpenClipboard(window):
             if time.monotonic() >= deadline: raise ClipboardUnavailable("The clipboard is busy. Use Copy.")
             time.sleep(.005)
@@ -101,28 +103,50 @@ class ClipboardSnapshot:
 def snapshot_clipboard():
     if sys.platform != "win32": return None
     user,kernel=_api()
-    formats,total=[],0
     with _opened(user):
-        kind=0
-        while True:
-            c.set_last_error(0)
-            kind=user.EnumClipboardFormats(kind)
-            if not kind:
-                if c.get_last_error(): raise ClipboardUnavailable("Clipboard formats could not be read. Use Copy.")
-                break
-            # Bitmap/metafile/owner-managed handles cannot be copied as HGLOBAL.
-            if kind not in {1,4,5,7,8,10,11,12,13,15,16,17} and kind < 0xC000:
-                raise ClipboardUnavailable("This clipboard format cannot be preserved. Your text is available to Copy.")
-            handle=user.GetClipboardData(kind)
-            size=kernel.GlobalSize(handle) if handle else 0
-            total+=size
-            if not size or total > 8*1024*1024 or len(formats) >= 256:
-                raise ClipboardUnavailable("This clipboard cannot be safely preserved. Use Copy.")
-            pointer=kernel.GlobalLock(handle)
-            if not pointer: raise ClipboardUnavailable("Clipboard data could not be preserved. Use Copy.")
-            try: formats.append((kind,c.string_at(pointer,size)))
-            finally: kernel.GlobalUnlock(handle)
+        formats = _snapshot_formats(user, kernel)
         return ClipboardSnapshot(formats,sequence_number())
+
+
+def _snapshot_formats(user, kernel):
+    # Enumerate first: requesting a delayed/synthesized format can change the
+    # available formats. CF_BITMAP is a GDI handle, not GlobalAlloc memory.
+    kinds, kind = [], 0
+    while True:
+        c.set_last_error(0)
+        kind = user.EnumClipboardFormats(kind)
+        if not kind:
+            if c.get_last_error():
+                raise ClipboardUnavailable("Clipboard formats could not be read. Try Paste again.")
+            break
+        if kind in kinds or len(kinds) >= 256:
+            raise ClipboardUnavailable("The clipboard contains too many formats to preserve.")
+        kinds.append(kind)
+    dib = 17 if 17 in kinds else 8 if 8 in kinds else None
+    if dib:
+        # Windows regenerates bitmap, palette and alternate DIB formats from a
+        # saved DIB. Save its richest representation once, keeping PNG/HTML and
+        # other registered data, without copying non-memory GDI handles.
+        kinds = [kind for kind in kinds if kind not in {2, 9, 8, 17} or kind == dib]
+    formats, total = [], 0
+    for kind in kinds:
+        if kind not in {1, 4, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17} and not (0x300 <= kind <= 0x3FF or kind >= 0xC000):
+            raise ClipboardUnavailable(f"Clipboard format {kind} cannot be preserved automatically.")
+        handle = user.GetClipboardData(kind)
+        size = kernel.GlobalSize(handle) if handle else 0
+        total += size
+        if not size:
+            raise ClipboardUnavailable(f"Clipboard format {kind} could not be read for preservation.")
+        if total > MAX_SNAPSHOT_BYTES:
+            raise ClipboardUnavailable("The clipboard is too large to preserve automatically (64 MB limit).")
+        pointer = kernel.GlobalLock(handle)
+        if not pointer:
+            raise ClipboardUnavailable("Clipboard data could not be preserved. Try Paste again.")
+        try:
+            formats.append((kind, c.string_at(pointer, size)))
+        finally:
+            kernel.GlobalUnlock(handle)
+    return formats
 
 
 class DelayedText:
@@ -133,7 +157,12 @@ class DelayedText:
         self.rendered = False
 
     def owns(self):
-        return self.owner.current is self and self.owner.user.GetClipboardOwner() == self.owner.window and sequence_number() == self.sequence
+        return self.owner.call(lambda: self.owner.owns(self))
+
+    def arm(self):
+        # Clipboard monitors can read before Ctrl+V. Such reads cannot prove
+        # the target consumed the paste that we are about to send.
+        self.owner.call(self.consumed.clear)
 
     def materialize(self):
         if self.owns() and not self.rendered:
@@ -160,6 +189,8 @@ class _ClipboardOwner:
             raise ClipboardUnavailable("Clipboard handoff could not start. Use Copy.")
 
     def call(self, callback):
+        if threading.get_ident() == getattr(self, 'thread_id', None):
+            return callback()
         done, result = threading.Event(), []
         self.tasks.put((callback, done, result))
         self.user.PostMessageW(self.window, 0x8001, 0, 0)
@@ -168,6 +199,48 @@ class _ClipboardOwner:
         if isinstance(result[0], BaseException):
             raise result[0]
         return result[0]
+
+    def owns(self, lease, *, opened=False):
+        if self.current is not lease or self.user.GetClipboardOwner() != self.window:
+            return False
+        current_sequence = sequence_number()
+        if current_sequence == lease.sequence:
+            return True
+        # Rendering and Windows' synthesized text formats can advance the
+        # sequence while this window remains owner. Confirm the actual Unicode
+        # payload under the clipboard lock instead of treating every advance as
+        # a new copy. A new owner or changed data still invalidates the lease.
+        if not lease.rendered or (not opened and not self.user.OpenClipboard(self.window)):
+            return False
+        try:
+            if self.user.GetClipboardOwner() != self.window:
+                return False
+            kind = 0
+            for _ in range(5):
+                kind = self.user.EnumClipboardFormats(kind)
+                if not kind:
+                    break
+                if kind not in {1, 7, 13, 16}:
+                    return False
+            else:
+                return False
+            handle = self.user.GetClipboardData(13)
+            expected = (lease.text + '\0').encode('utf-16-le')
+            if not handle or self.kernel.GlobalSize(handle) < len(expected):
+                return False
+            pointer = self.kernel.GlobalLock(handle)
+            if not pointer:
+                return False
+            try:
+                if c.string_at(pointer, len(expected)) != expected:
+                    return False
+            finally:
+                self.kernel.GlobalUnlock(handle)
+            lease.sequence = sequence_number()
+            return True
+        finally:
+            if not opened:
+                self.user.CloseClipboard()
 
     def render(self, lease):
         data = (lease.text + '\0').encode('utf-16-le')
@@ -203,7 +276,7 @@ class _ClipboardOwner:
             if not self.user.OpenClipboard(self.window):
                 raise ClipboardUnavailable("The clipboard is busy. Try Paste again.")
             try:
-                if sequence_number() != previous.sequence:
+                if sequence_number() != previous.sequence and not (self.current and self.owns(self.current, opened=True)):
                     raise ClipboardUnavailable("The clipboard changed. Try Paste again.")
                 if not self.user.EmptyClipboard():
                     raise ClipboardUnavailable("The clipboard could not be updated.")
@@ -213,15 +286,18 @@ class _ClipboardOwner:
                     _write(self.user, self.kernel, previous.formats)
                     raise ClipboardUnavailable("Delayed clipboard rendering is unavailable.")
                 lease = DelayedText(self, text, target)
-                lease.sequence = sequence_number()
                 self.current = lease
-                return lease
             finally:
                 self.user.CloseClipboard()
+            # Windows can finish publishing/synthesizing formats on close.
+            # Sampling before close makes our own clipboard write look foreign.
+            lease.sequence = sequence_number()
+            return lease
         return self.call(publish)
 
     def run(self):
         from ctypes import wintypes as w
+        self.thread_id = threading.get_ident()
         try:
             if self.desktop is not None:
                 user = c.WinDLL('user32', use_last_error=True)

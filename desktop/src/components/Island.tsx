@@ -271,7 +271,7 @@ export function Island() {
         ? `${hub.nextAlarm.title}, ${countdown(hub.nextAlarm.due - hub.now)} until alarm`
         : kind === "recording"
           ? `Listening. ${pending} pending reminders.`
-          : kind === "delivery" ? "Text needs insertion. Open Dictation to paste or copy your transcript."
+          : kind === "delivery" ? `Text needs insertion. ${runtime?.detail || ""} Open Dictation to paste or copy your transcript.`
           : kind === "error"
             ? "VoicePrompt needs attention"
             : pending
@@ -323,7 +323,7 @@ export function Island() {
               <span>{kind === "preparing" ? "Preparing" : "Finishing"}</span>
             </>
           ) : kind === "delivery" ? (
-            <><AlertTriangle size={15} /><span>Text ready</span></>
+            <><AlertTriangle size={15} /><span>Paste help</span></>
           ) : kind === "error" ? (
             <>
               <AlertTriangle size={15} />

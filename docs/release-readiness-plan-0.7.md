@@ -4,13 +4,13 @@ Reviewed: 6 November 2026. Baseline: `04682002ea727cfaed05633cb5b406a4775fb6e0`.
 
 ## Decision
 
-Hold a broad stable release. The baseline has green automated checks, but a
-reproduced shared-model deletion defect must be fixed first. Publishing and
-real-device acceptance also have gaps. A controlled beta is the next milestone
-after the safety fixes and minimum device checks below; it is not ready today
-simply because CI is green.
+Hold a broad stable release for the remaining device acceptance. The reproduced
+cache-deletion defect and the engineering/publishing gaps below have now been
+addressed in 0.7.1-rc.1. The candidate is installed locally, has green Windows CI,
+and is available as an unpublished release draft. Automated checks do not replace
+physical speech and clean Windows 10/11 acceptance.
 
-Implementation is authorized and underway as **0.7.1-rc.1**. The original review
+Implementation is complete as **0.7.1-rc.1**. The original review
 below is retained as the problem statement. Current outcomes are tracked in the
 [candidate acceptance record](release-acceptance-0.7.1-rc.1.md). Windows publisher
 signing and SmartScreen work are explicitly deferred at the owner's request.

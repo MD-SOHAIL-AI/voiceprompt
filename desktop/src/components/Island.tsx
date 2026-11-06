@@ -264,8 +264,11 @@ export function Island() {
         ),
       )
     : 0;
+  const successLabel = runtime.insertionStatus === "sent" ? "Done" : "Copied";
   const fullLabel =
-    kind === "focus" && timer
+    success && !deferred
+      ? successLabel
+      : kind === "focus" && timer
       ? `${timer.title}, ${countdown(timer.remaining)} remaining, ${timer.status}`
       : kind === "alarm" && hub?.nextAlarm
         ? `${hub.nextAlarm.title}, ${countdown(hub.nextAlarm.due - hub.now)} until alarm`
@@ -311,9 +314,7 @@ export function Island() {
           {success && !deferred ? (
             <>
               <Check size={15} />
-              <span>
-                {runtime.insertionStatus === "sent" ? "Paste sent" : "Copied"}
-              </span>
+              <span>{successLabel}</span>
             </>
           ) : kind === "recording" ? (
             <Waveform values={meter} compact />

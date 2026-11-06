@@ -398,13 +398,14 @@ class ModelLibrary:
                     if snapshot is not None:
                         for _ in PurePosixPath(model['files'][0]['name']).parts:
                             snapshot = snapshot.parent
-                    if snapshot != Path(record['path']):
+                    if snapshot is None or snapshot.resolve() != Path(record['path']).resolve():
                         raise ValueError('The shared cache changed. Refresh before deleting.')
+                    snapshot = snapshot.resolve()
                     repository = snapshot.parent.parent
                     if snapshot.name != model['revision'] or snapshot.parent.name != 'snapshots' or repository.name != 'models--' + model['repo'].replace('/', '--'):
                         raise ValueError('The shared cache layout changed. Refresh before deleting.')
                     cache = scan_cache_dir(repository.parent)
-                    selected = [repo for repo in cache.repos if repo.repo_id == model['repo'] and repo.repo_type == 'model' and repo.repo_path == repository]
+                    selected = [repo for repo in cache.repos if repo.repo_id == model['repo'] and repo.repo_type == 'model' and repo.repo_path.resolve() == repository]
                     if len(selected) != 1:
                         raise ValueError('The selected shared repository could not be verified.')
                     # Revision identities can be retained by forks. A global
@@ -413,7 +414,7 @@ class ModelLibrary:
                     paths = strategy.repos | strategy.snapshots | strategy.refs | strategy.blobs
                     if not paths or any(not path.resolve().is_relative_to(repository.resolve()) for path in paths):
                         raise ValueError('The cache deletion plan leaves the selected repository.')
-                    if any(path != repository for path in strategy.repos) or any(path != snapshot for path in strategy.snapshots):
+                    if any(path.resolve() != repository for path in strategy.repos) or any(path.resolve() != snapshot for path in strategy.snapshots):
                         raise ValueError('The cache deletion plan includes another model revision.')
                     freed = strategy.expected_freed_size
                     strategy.execute()

@@ -282,6 +282,7 @@ mod tests {
     fn semantic_versions_and_stable_channel() {
         assert!(is_newer("0.6.10", "0.6.9").unwrap());
         assert!(!is_newer("0.6.2", "0.6.2").unwrap());
+        assert!(is_newer("0.7.1", "0.7.1-rc.1").unwrap());
         assert!(!is_newer("0.6.1", "0.6.2").unwrap());
         assert!(is_newer("0.6.2-preview.1", "0.6.1").is_err());
         assert!(is_newer("0.6.2+build", "0.6.1").is_err());

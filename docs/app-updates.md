@@ -47,16 +47,22 @@ tag-release build step; they are not passed to PR tests or artifacts.
 
 ## Publish a stable update
 
-1. Increase the canonical version in `pyproject.toml` and synchronize Python,
-   desktop package/lockfile, Cargo/lockfile, and Tauri versions. Run
-   `python scripts/verify_versions.py`.
+1. Run `python scripts/set_version.py VERSION` to synchronize Python,
+   desktop package/lockfile, Cargo/lockfile, Tauri and Windows resources. Run
+   `python scripts/verify_versions.py`. Candidates use `VERSION-rc.N`; only
+   numeric versions can generate the stable update feed.
 2. Add `docs/release-notes-VERSION.md`, run checks, and merge into main.
 3. Push the matching stable version tag, such as `v0.6.3`.
 
 `.github/workflows/release.yml` verifies tag/main ancestry, runs regressions,
 builds the complete app, signs metadata, verifies it using the packaged native
-app, checks the engine/native UI/installer, uploads a complete draft, then
-publishes it as latest. Failed checks publish nothing. Ordinary main pushes/PRs
+app, checks the engine/native UI/installer and pinned previous-stable upgrade,
+then transfers the verified package to a separate `production` environment job.
+After the configured production review, it uploads a complete draft and
+independently downloads every required asset. Hosted bytes, SHA-256 sidecar and
+native update-signature verification must pass before publishing as latest.
+Evidence is retained for 90 days. Failed checks leave publication blocked.
+Ordinary main pushes/PRs
 do not publish. Prereleases are excluded. Never replace published installers;
 repair a faulty release with a higher version.
 

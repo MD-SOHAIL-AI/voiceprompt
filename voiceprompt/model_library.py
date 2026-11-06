@@ -11,6 +11,7 @@ import shutil
 import threading
 import time
 import urllib.request
+from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 from platformdirs import user_cache_dir
@@ -196,7 +197,10 @@ class ModelLibrary:
                 first = try_to_load_from_cache(model['repo'], model['files'][0]['name'], revision=model['revision'])
                 if not isinstance(first, str):
                     continue
-                record = {'path': str(Path(first).parent), 'ownership': 'shared', 'kind': 'huggingface',
+                snapshot = Path(first)
+                for _ in PurePosixPath(model['files'][0]['name']).parts:
+                    snapshot = snapshot.parent
+                record = {'path': str(snapshot), 'ownership': 'shared', 'kind': 'huggingface',
                           'repo': model['repo'], 'revision': model['revision']}
             elif model.get('legacy_url'):
                 record = {'path': str(moonshine_cache() / model['legacy_url'].removeprefix('https://')),
@@ -390,10 +394,27 @@ class ModelLibrary:
                 if record.get('kind') == 'huggingface':
                     from huggingface_hub import scan_cache_dir, try_to_load_from_cache
                     first = try_to_load_from_cache(model['repo'], model['files'][0]['name'], revision=model['revision'])
-                    if not isinstance(first, str) or Path(first).parent != Path(record['path']):
+                    snapshot = Path(first) if isinstance(first, str) else None
+                    if snapshot is not None:
+                        for _ in PurePosixPath(model['files'][0]['name']).parts:
+                            snapshot = snapshot.parent
+                    if snapshot != Path(record['path']):
                         raise ValueError('The shared cache changed. Refresh before deleting.')
-                    cache = scan_cache_dir(Path(first).parents[3])
-                    strategy = cache.delete_revisions(model['revision'])
+                    repository = snapshot.parent.parent
+                    if snapshot.name != model['revision'] or snapshot.parent.name != 'snapshots' or repository.name != 'models--' + model['repo'].replace('/', '--'):
+                        raise ValueError('The shared cache layout changed. Refresh before deleting.')
+                    cache = scan_cache_dir(repository.parent)
+                    selected = [repo for repo in cache.repos if repo.repo_id == model['repo'] and repo.repo_type == 'model' and repo.repo_path == repository]
+                    if len(selected) != 1:
+                        raise ValueError('The selected shared repository could not be verified.')
+                    # Revision identities can be retained by forks. A global
+                    # hash lookup can otherwise plan deletion of another repo.
+                    strategy = replace(cache, repos=frozenset(selected)).delete_revisions(model['revision'])
+                    paths = strategy.repos | strategy.snapshots | strategy.refs | strategy.blobs
+                    if not paths or any(not path.resolve().is_relative_to(repository.resolve()) for path in paths):
+                        raise ValueError('The cache deletion plan leaves the selected repository.')
+                    if any(path != repository for path in strategy.repos) or any(path != snapshot for path in strategy.snapshots):
+                        raise ValueError('The cache deletion plan includes another model revision.')
                     freed = strategy.expected_freed_size
                     strategy.execute()
                     if any(path.exists() for path, _ in self._paths(model, record)):

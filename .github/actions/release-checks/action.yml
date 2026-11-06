@@ -1,0 +1,62 @@
+name: Required release checks
+description: Shared source, clipboard, browser and dependency validation for main and release builds.
+runs:
+  using: composite
+  steps:
+    - name: Validate Python and metadata
+      shell: pwsh
+      run: |
+        python -m pip check
+        if ($LASTEXITCODE -ne 0) { throw 'Python dependency validation failed.' }
+        python -m compileall -q voiceprompt tests scripts
+        if ($LASTEXITCODE -ne 0) { throw 'Python compilation failed.' }
+        python scripts/verify_versions.py
+        if ($LASTEXITCODE -ne 0) { throw 'Build metadata differs.' }
+    - name: Audit Python dependencies
+      shell: pwsh
+      run: |
+        python -m pip install --target .tools/audit-deps pip-audit==2.10.1
+        if ($LASTEXITCODE -ne 0) { throw 'Audit tool installation failed.' }
+        New-Item -ItemType Directory -Force build | Out-Null
+        $env:PYTHONPATH = (Join-Path $PWD '.tools/audit-deps')
+        python -m pip_audit -r requirements-lock.txt --no-deps --disable-pip --format json --output build/python-audit.json
+        if ($LASTEXITCODE -ne 0) { throw 'Python dependency audit failed.' }
+    - name: Engine and persistence regressions
+      shell: pwsh
+      env:
+        VOICEPROMPT_TEST_LEGACY_TK: '0'
+        HF_HOME: ${{ runner.temp }}/voiceprompt-test-hf
+      run: |
+        python -m unittest discover -s tests -v
+        if ($LASTEXITCODE -ne 0) { throw 'Python regressions failed.' }
+        python scripts/check_engine_bridge.py
+        if ($LASTEXITCODE -ne 0) { throw 'Source bridge verification failed.' }
+    - name: Native clipboard delivery
+      shell: pwsh
+      run: |
+        python scripts/check_clipboard_handoff.py --allow-hosted-runner-clipboard
+        if ($LASTEXITCODE -ne 0) { throw 'Windows clipboard delivery failed.' }
+    - name: Frontend build and dependency checks
+      shell: pwsh
+      working-directory: desktop
+      run: |
+        npm ci
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend dependencies failed.' }
+        npm run test
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend tests failed.' }
+        npm run build
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+        npm audit --audit-level=high
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency audit failed.' }
+    - name: Browser flows, model lifecycle and accessibility
+      shell: pwsh
+      working-directory: desktop
+      run: |
+        npx playwright install chromium
+        if ($LASTEXITCODE -ne 0) { throw 'Browser installation failed.' }
+        node scripts/verify-ui.cjs --preview
+        if ($LASTEXITCODE -ne 0) { throw 'Browser verification failed.' }
+        node scripts/verify-updates.cjs
+        if ($LASTEXITCODE -ne 0) { throw 'Update flow verification failed.' }
+        node scripts/check-model-library.mjs --start-server
+        if ($LASTEXITCODE -ne 0) { throw 'Model lifecycle verification failed.' }

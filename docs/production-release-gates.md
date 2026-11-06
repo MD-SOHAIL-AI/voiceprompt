@@ -13,7 +13,7 @@ acceptance work; publishing an update does not establish those manual results.
 ## Full hardware and publisher-signing acceptance
 
 - [ ] The proposed release commit has green Windows Actions and a checksum-matched installer.
-- [ ] A clean Windows 10 x64 normal-user VM installs, launches, upgrades from 0.4.0,
+- [ ] A clean Windows 10 x64 normal-user VM installs, launches, upgrades from 0.6.3,
       uninstalls while running, and preserves user data and portable instances.
 - [ ] A clean Windows 11 x64 normal-user VM performs the same full lifecycle.
 - [ ] An actual microphone is selected; starting, stopping and rapid hotkey
@@ -70,6 +70,6 @@ model accuracy, independent legal/security review and publisher signing.
 ## Versioning
 
 Do not retag or overwrite published releases. Preview identifiers use
-`vMAJOR.MINOR.PATCH-preview.N` or `vMAJOR.MINOR.PATCH-beta.N`. Stable-channel
+`vMAJOR.MINOR.PATCH-preview.N`, `vMAJOR.MINOR.PATCH-beta.N` or `vMAJOR.MINOR.PATCH-rc.N`. Stable-channel
 tags use `vMAJOR.MINOR.PATCH` and the update-signed release workflow. Release
 notes must distinguish automated verification from outstanding manual checks.

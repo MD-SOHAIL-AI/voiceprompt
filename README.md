@@ -16,9 +16,12 @@ installation. Saved data and model caches are preserved. Update signatures are
 verified by the app; Windows publisher signing remains separate. See the
 [release notes](docs/release-notes-0.6.3.md) for installation and validation limits.
 
-The 0.6.0 release candidate adds local-only processing, bounded recovery and transport, safer clipboard handling, phrase decoding, and new recording clicks. See the [candidate notes](docs/release-notes-0.6.0.md) for verification and outstanding production gates.
-
-The 0.5.1 desktop redesign is available as an [unsigned Windows preview](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.5.1-preview.1). See the [release notes](docs/release-notes-0.5.1.md) for features, validation and remaining manual hardware checks. Models download separately on first preparation; cached models work offline. Main-branch pushes do not automatically publish releases.
+Current development is **0.7.1-rc.1**: downloadable/deletable model profiles,
+recording completeness checks, clipboard handoff fixes, and clearer setup.
+See the [candidate notes](docs/release-notes-0.7.1-rc.1.md) and
+[readiness record](docs/release-readiness-plan-0.7.md). Candidates require manual
+installation and are excluded from the stable update feed. Ordinary main pushes
+do not publish releases.
 
 Windows can show **Windows protected your PC** for these unsigned installers.
 Publisher signing is not configured yet. See [Windows signing and SmartScreen](docs/windows-signing.md)
@@ -54,11 +57,11 @@ and update both windows. **Show floating island** hides or reveals it;
 expanded island offers the same control. The Island transparency slider ranges from Solid to 25% transparent; text and controls remain opaque. With pinning off, active recordings,
 timers, alarms and pending reminders still keep the island visible.
 
-1. Choose a microphone, use **Check microphone**, then select **Prepare model and microphone**.
+1. In current candidates, open **Settings → Models**, download a model, then choose **Use model**. Choose a microphone and use **Check microphone**. Published 0.6.3 uses its earlier model preparation controls.
 2. Wait for **Ready to dictate**.
 3. Put the cursor in the destination application.
 4. Hold Right Ctrl, speak, and release. Settings also offers press-to-start/stop mode and alternative keys.
-5. The final text appears at the cursor and in VoicePrompt. If the active window changed, use **Copy text** to choose the destination yourself.
+5. The final text appears at the cursor and in VoicePrompt. The floating window says **Done** after insertion. If insertion needs attention, use **Paste to previous app** or **Copy**, with the transcript kept available.
 
 Recordings support five minutes, with an elapsed timer and a warning during the last ten seconds. A 180 ms release tail preserves final syllables. When recognition falls behind, capture continues and the indicator says it is catching up. Microphone failures, recognition timeouts, and duration limits have explicit messages.
 
@@ -83,7 +86,7 @@ Timers and planner data work offline. Alarm delivery requires VoicePrompt to be 
 
 Settings, history, planner data, runtime caches, and bounded diagnostics live under `%LOCALAPPDATA%\VoicePrompt`. Existing data stays in place; configuration migration and the first desktop planner upgrade create backups. Uninstall preserves user data and cached models.
 
-Audio and transcript processing remain local. Gemini and OpenRouter integrations and key-entry controls have been removed. Upgrading retires VoicePrompt's old provider credentials from Windows Credential Manager; a failed removal can be retried in Settings. Model preparation can download model files, and contest schedules use their existing online services. CLIST credentials remain in Windows Credential Manager, separate from settings and SQLite.
+Audio and transcript processing remain local. Gemini and OpenRouter integrations and key-entry controls have been removed. Upgrading retires VoicePrompt's old provider credentials from Windows Credential Manager; a failed removal can be retried in Settings. Current candidates download models only on request and can refresh signed model metadata from GitHub. Contest schedules use their existing online services. CLIST credentials remain in Windows Credential Manager, separate from settings and SQLite.
 
 History contains transcript text on this device. Set its limit to zero to disable future persistence, or use **Clear history**. Diagnostic metrics contain timestamps, duration, backlog, stop reason, engine, and outcome, without transcript text or audio. No telemetry is uploaded automatically.
 

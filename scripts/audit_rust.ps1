@@ -1,4 +1,4 @@
-param([string]$Report = 'build\rust-audit-0.6.0.json')
+param([string]$Report = 'build\rust-audit.json')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $destination = Join-Path $root '.tools\cargo-audit-0.22.2'

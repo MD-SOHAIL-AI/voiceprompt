@@ -629,6 +629,22 @@ pub fn helper_mode() -> bool {
     let arguments: Vec<String> = std::env::args().collect();
     if arguments
         .get(1)
+        .is_some_and(|value| value == "--verify-model-catalog")
+    {
+        let result = (|| {
+            if arguments.len() != 3 {
+                return Err("Expected a signed catalog path.".to_string());
+            }
+            crate::model_catalog::verify(
+                &read_bounded(Path::new(&arguments[2]), MAX_METADATA)?,
+                PUBLIC_KEY,
+            )?;
+            Ok(())
+        })();
+        std::process::exit(if result.is_ok() { 0 } else { 1 });
+    }
+    if arguments
+        .get(1)
         .is_some_and(|value| value == "--verify-update")
     {
         let result = (|| {

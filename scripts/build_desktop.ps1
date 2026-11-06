@@ -83,6 +83,11 @@ try {
     $fontLicenses = Join-Path $stage 'licenses\encode-sans'
     New-Item -ItemType Directory -Force -Path $fontLicenses | Out-Null
     Copy-Item -LiteralPath 'desktop\src\assets\fonts\OFL.txt' -Destination $fontLicenses
+    $verifierLicenses = Join-Path $stage 'licenses\minisign-verify'
+    New-Item -ItemType Directory -Force -Path $verifierLicenses | Out-Null
+    foreach ($notice in @('LICENSE', 'UPSTREAM.md')) {
+        Copy-Item -LiteralPath (Join-Path 'desktop\src-tauri\vendor\minisign-verify' $notice) -Destination $verifierLicenses
+    }
     if ($signing.Enabled) {
         foreach ($file in @((Join-Path $stage 'VoicePrompt.exe'), (Join-Path $engineStage 'VoicePromptEngine.exe'))) {
             Invoke-VoicePromptSigning -Signing $signing -Path $file
@@ -118,7 +123,8 @@ try {
         }
         if (-not (Test-Path -LiteralPath $InnoCompiler)) { $InnoCompiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' }
         if (-not (Test-Path -LiteralPath $InnoCompiler)) { throw 'Inno Setup 6 is required for the installer' }
-        $compilerArguments = @('/DAppVersion=' + $version)
+        $numericVersion = [regex]::Match($version, '^\d+\.\d+\.\d+').Value + '.0'
+        $compilerArguments = @(('/DAppVersion=' + $version), ('/DAppFileVersion=' + $numericVersion))
         if ($signing.Enabled) {
             # Inno signs Setup, its temporary copies and the embedded uninstaller.
             # Use a fresh directory so no cached uninstaller from another signer is reused.

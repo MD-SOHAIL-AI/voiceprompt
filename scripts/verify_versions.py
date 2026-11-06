@@ -2,6 +2,7 @@
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -14,6 +15,12 @@ files = {'desktop/package.json': json.loads((root / 'desktop/package.json').read
          'voiceprompt/__init__.py': re.search(r'__version__ = "([^"]+)"', (root / 'voiceprompt/__init__.py').read_text())[1]}
 for name, value in files.items():
     if value != version: raise SystemExit(f'{name}: {value} differs from canonical version {version}')
+lock = json.loads((root / 'desktop/package-lock.json').read_text())
+if lock['version'] != version or lock['packages']['']['version'] != version:
+    raise SystemExit('desktop/package-lock.json differs from the canonical version.')
+cargo = tomllib.loads((root / 'desktop/src-tauri/Cargo.lock').read_text())
+if [package['version'] for package in cargo['package'] if package['name'] == 'voiceprompt-desktop'] != [version]:
+    raise SystemExit('desktop/src-tauri/Cargo.lock differs from the canonical version.')
 windows_version = (root / 'packaging/version.txt').read_text()
 numeric_version = tuple(map(int, version.split('-', 1)[0].split('.'))) + (0,)
 for field in ('filevers', 'prodvers'):

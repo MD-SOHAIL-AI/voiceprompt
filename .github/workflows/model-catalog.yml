@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: voiceprompt-model-catalog
+  cancel-in-progress: false
 jobs:
   catalog:
     runs-on: windows-latest
@@ -15,6 +18,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
       - run: pip install -r requirements-lock.txt
       - run: npm ci
         working-directory: desktop
@@ -28,13 +35,16 @@ jobs:
           VOICEPROMPT_UPDATE_PRIVATE_KEY: ${{ secrets.VOICEPROMPT_UPDATE_PRIVATE_KEY }}
           VOICEPROMPT_UPDATE_KEY_PASSWORD: ${{ secrets.VOICEPROMPT_UPDATE_KEY_PASSWORD }}
         run: python scripts/sign_model_catalog.py
-      - name: Publish catalog independently of app updates
+      - name: Build the application's native signature verifier
+        working-directory: desktop
+        run: npm run tauri -- build --no-bundle --ci
+      - name: Verify and publish catalog independently of app updates
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view model-catalog --repo $env:GITHUB_REPOSITORY 2>$null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create model-catalog --repo $env:GITHUB_REPOSITORY --prerelease --latest=false --title 'Supported speech model catalog' --notes 'Reviewed, signed model metadata. Models download only at user request.'
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-          gh release upload model-catalog release/model-catalog.json --repo $env:GITHUB_REPOSITORY --clobber
+        run: python scripts/publish_model_catalog.py --native-exe desktop/src-tauri/target/release/VoicePrompt.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-publication-evidence
+          retention-days: 90
+          path: build/catalog-publication.json

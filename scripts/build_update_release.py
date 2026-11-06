@@ -37,6 +37,8 @@ def main():
     if not PUBLIC_KEY.read_text().strip():
         raise ValueError("Configure the public update key before building.")
     version = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M)[1]
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError('A prerelease cannot generate the stable update feed. Build it through the preview pipeline.')
     if not options.inno_compiler.is_file():
         fallback = Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "Inno Setup 6/ISCC.exe"
         if not fallback.is_file(): raise ValueError("Inno Setup 6 is required.")

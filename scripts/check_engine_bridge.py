@@ -93,11 +93,22 @@ def main():
         return
     profile = ROOT / '.tools' / ('bridge-profile-' + uuid.uuid4().hex)
     subprocess.run([sys.executable, str(ROOT / 'scripts/create_acceptance_profile.py'), str(profile)], check=True)
+    # Start from the previous stable configuration format, including saved data.
+    original = json.loads((profile / 'config.json').read_text(encoding='utf-8'))
+    original.update(config_version=7, backend='nemotron', hotkey='right_ctrl')
+    original.pop('selected_model_id', None)
+    (profile / 'config.json').write_text(json.dumps(original), encoding='utf-8')
+    history_before = (profile / 'history.json').read_bytes()
     command = [str(args.engine.resolve()), '--desktop-sidecar'] if args.engine else [sys.executable, '-u', '-m', 'voiceprompt.desktop_sidecar']
     client = Client(command, profile)
     try:
         state = client.request('bootstrap')
         assert state['version'] == 2 and state['runtime']['acceptanceProfile']
+        assert state['settings']['config_version'] == 8
+        assert state['settings']['backend'] == 'nemotron'
+        assert state['settings']['selected_model_id'] == 'nemotron-q8'
+        assert json.loads((profile / 'config.v7.bak').read_text(encoding='utf-8')) == original
+        assert (profile / 'history.json').read_bytes() == history_before
         assert 'credentials' not in state
         assert 'cleanup_provider' not in state['settings']
         assert state['planner'] is not None, state['runtime']['plannerError']
@@ -168,7 +179,8 @@ def main():
     finally:
         recovered.close()
     result = {'mode': 'frozen' if args.engine else 'source', 'passed': True,
-              'checks': ['Real bootstrap', 'Credential isolation', 'Task persistence after restart',
+              'checks': ['Real bootstrap', 'Previous-stable settings migration, original backup and history preservation',
+                         'Credential isolation', 'Task persistence after restart',
                          'Timer pause/resume/end', 'Stale action rejection', 'Graceful shutdown',
                          'Duplicate engine conflict and recovery guidance', 'Explicit settings recovery with preserved original']}
     (ROOT / 'build').mkdir(exist_ok=True)

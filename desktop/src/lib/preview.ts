@@ -127,6 +127,11 @@ const sampleModels = bundledModels.models.map((model) => ({
 let modelOperation: Record<string, unknown> = { state: "idle" };
 let modelDownload = 0;
 const catalogStatus = { enabled: true, last_checked: 0, message: "Sample model library. No files are downloaded in this preview." };
+if (state === "onboarding") {
+  settings.onboarding_completed = false;
+  value.runtime.ready = false;
+  for (const model of sampleModels) { model.installed = false; model.ownership = null; }
+}
 if (state === "delivery") {
   value.runtime.latestText = "This complete transcript needs to be inserted into the previous application.";
   value.runtime.insertionStatus = "copy";

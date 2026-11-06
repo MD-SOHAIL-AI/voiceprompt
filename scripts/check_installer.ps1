@@ -1,4 +1,4 @@
-param([string]$Installer = '', [switch]$AllowUnsignedPreview)
+param([string]$Installer = '', [switch]$AllowUnsignedPreview, [string]$BaselineInstaller = '')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'windows_signing.ps1')
@@ -27,6 +27,14 @@ $installerPath = (Resolve-Path -LiteralPath (Join-Path $projectRoot $Installer))
 $expectedSigner = if ($AllowUnsignedPreview) { '' } else { (Assert-VoicePromptSignature -Path $installerPath).SignerCertificate.Thumbprint }
 $installedExe = Join-Path $target 'VoicePrompt.exe'
 $report = [ordered]@{ install = $false; reinstall = $false; workers = $false; live_uninstall = $false; runtime_startup_removed = $false; legacy_startup_removed = $false; unrelated_startup_preserved = $false; portable_preserved = $false; shortcuts_removed = $false; data_preserved = $false; uninstall = $false; startup_preserved = $false }
+if ($BaselineInstaller) {
+    $BaselineInstaller = (Resolve-Path -LiteralPath $BaselineInstaller).Path
+    if ((Get-FileHash -LiteralPath $BaselineInstaller -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'e9530b627ab67c9a9bb4259556b21fc6b09efbaf74db2067abec66d1ba96edee') {
+        throw 'The previous-stable installer does not match the reviewed 0.6.3 artifact.'
+    }
+    $report.upgrade_from_0_6_3 = $false
+    $report.binary_rollback_to_0_6_3 = $false
+}
 $dataDirectory = Join-Path $env:LOCALAPPDATA 'VoicePrompt'
 New-Item -ItemType Directory -Force -Path $dataDirectory | Out-Null
 $dataMarker = Join-Path $dataDirectory ('installer-check-' + [guid]::NewGuid().ToString('N') + '.txt')
@@ -80,6 +88,10 @@ try {
         # Reproduce empty folders inherited from a failed older uninstall.
         New-Item -ItemType Directory -Force -Path (Join-Path $target '_internal\orphan\empty') | Out-Null
         $startupTask = if ($scenario -eq 'installer-startup') { 'startup' } else { '!startup' }
+        if ($BaselineInstaller -and $scenario -eq 'installer-startup') {
+            $baseline = Start-Process -FilePath $BaselineInstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $target + '"'),'/MERGETASKS=!startup') -WindowStyle Hidden -Wait -PassThru
+            if ($baseline.ExitCode -ne 0 -or (Get-Item -LiteralPath $installedExe).VersionInfo.ProductVersion -ne '0.6.3') { throw 'Previous stable installation failed' }
+        }
         foreach ($pass in 1,2) {
             $process = Start-Process -FilePath $installerPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $target + '"'),('/MERGETASKS=desktopicon,' + $startupTask)) -WindowStyle Hidden -Wait -PassThru
             if ($process.ExitCode -ne 0) { throw "Installer pass $pass failed: $($process.ExitCode)" }
@@ -89,6 +101,16 @@ try {
                 }
             }
             if ($pass -eq 1) { $report.install = $true } else { $report.reinstall = $true }
+        }
+        if ($BaselineInstaller -and $scenario -eq 'installer-startup') {
+            $candidateHash = (Get-FileHash -LiteralPath $installedExe).Hash
+            if ($candidateHash -ne (Get-FileHash -LiteralPath (Join-Path $projectRoot 'dist\VoicePrompt\VoicePrompt.exe')).Hash) { throw 'Upgrade did not install the verified candidate shell' }
+            $report.upgrade_from_0_6_3 = $true
+            $rollback = Start-Process -FilePath $BaselineInstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $target + '"'),'/MERGETASKS=!startup') -WindowStyle Hidden -Wait -PassThru
+            if ($rollback.ExitCode -ne 0 -or (Get-Item -LiteralPath $installedExe).VersionInfo.ProductVersion -ne '0.6.3') { throw 'Binary rollback failed' }
+            $report.binary_rollback_to_0_6_3 = $true
+            $restore = Start-Process -FilePath $installerPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $target + '"'),'/MERGETASKS=desktopicon,startup') -WindowStyle Hidden -Wait -PassThru
+            if ($restore.ExitCode -ne 0 -or (Get-FileHash -LiteralPath $installedExe).Hash -ne $candidateHash) { throw 'Candidate restoration after rollback failed' }
         }
         if (-not (Test-Path -LiteralPath $desktopLink) -or -not (Test-Path -LiteralPath $menuLink)) { throw 'Installer shortcuts were not created' }
         if (-not (Test-Path -LiteralPath $runKey)) { New-Item -Path $runKey -Force | Out-Null }

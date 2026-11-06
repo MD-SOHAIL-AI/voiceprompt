@@ -1,6 +1,20 @@
 import { chromium, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const base = process.argv.includes('--start-server') ? 'http://127.0.0.1:1430' : 'http://127.0.0.1:1420';
+const server = process.argv.includes('--start-server') ? spawn(process.execPath,
+  [fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url)), '--host', '127.0.0.1', '--port', '1430', '--strictPort'],
+  { cwd: fileURLToPath(new URL('../', import.meta.url)), windowsHide: true, stdio: 'ignore' }) : null;
+if (server) {
+  for (let attempt = 0; ; attempt++) {
+    try { if ((await fetch(base)).ok) break; } catch {}
+    if (attempt >= 100) { server.kill(); throw new Error('Model preview did not start'); }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
 
 const output = new URL('../../build/model-library-review/', import.meta.url);
 await mkdir(output, { recursive: true });
@@ -10,7 +24,22 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
 try {
-  await page.goto('http://127.0.0.1:1420/?preview=1');
+  await page.goto(`${base}/?preview=1&state=onboarding`);
+  let setup = page.getByRole('dialog');
+  await expect(setup.getByRole('button', { name: 'Prepare model', exact: true })).toBeDisabled();
+  await setup.getByRole('button', { name: 'Choose and download a model' }).click();
+  const firstModel = page.locator('.model-library li').filter({ hasText: 'Whisper Tiny English' });
+  await firstModel.getByRole('button', { name: 'Download', exact: true }).click();
+  await firstModel.getByRole('button', { name: 'Use model', exact: true }).click();
+  await page.getByRole('button', { name: 'Run setup again', exact: true }).click();
+  await expect(setup.getByRole('button', { name: 'Prepare model', exact: true })).toBeEnabled();
+  await setup.getByRole('button', { name: 'Continue setup later' }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Run setup again', exact: true }).click();
+  await expect(setup).toBeVisible();
+  await setup.getByRole('button', { name: 'Finish setup', exact: true }).click();
+  await expect(setup).not.toBeVisible();
+  await page.goto(`${base}/?preview=1`);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const library = page.locator('.model-library');
   await expect(library.getByText('Whisper Tiny English', { exact: true })).toBeVisible();
@@ -39,18 +68,19 @@ try {
   await page.screenshot({ path: new URL('installed-compact.png', output).pathname.replace(/^\/(\w:)/, '$1') });
   const overflow = await library.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
   expect(overflow).toBe(false);
-  await page.goto('http://127.0.0.1:1420/?preview=1&state=delivery');
+  await page.goto(`${base}/?preview=1&state=delivery`);
   await expect(page.getByText('Text needs insertion', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Paste to previous app' })).toBeVisible();
   await page.getByRole('button', { name: 'Paste to previous app' }).click();
   await expect(page.getByText('Text needs insertion', { exact: true })).toHaveCount(0);
-  await page.goto('http://127.0.0.1:1420/?surface=island&preview=1&state=delivery');
+  await page.goto(`${base}/?surface=island&preview=1&state=delivery`);
   await page.waitForTimeout(1300);
   await expect(page.getByRole('button', { name: /Text needs insertion/ })).toBeVisible();
   await page.screenshot({ path: new URL('persistent-recovery.png', output).pathname.replace(/^\/(\w:)/, '$1') });
   expect(errors).toEqual([]);
-  await writeFile(new URL('report.json', output), JSON.stringify({ passed: true, checks: ['download', 'cancel', 'select', 'delete selected model', 'clipboard recovery', 'persistent island', '800px layout', 'serious/critical accessibility'], errors }, null, 2));
+  await writeFile(new URL('report.json', output), JSON.stringify({ passed: true, checks: ['empty-cache first run', 'download before prepare', 'reopen dismissed setup', 'download', 'cancel', 'select', 'delete selected model', 'clipboard recovery', 'persistent island', '800px layout', 'serious/critical accessibility'], errors }, null, 2));
   console.log('Model library and delivery UI checks passed. Screenshots: build/model-library-review');
 } finally {
   await browser.close();
+  server?.kill();
 }

@@ -30,56 +30,20 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Install tested Python dependencies
         run: python -m pip install -r requirements-lock.txt
-      - name: Validate Python and metadata
-        run: |
-          python -m pip check
-          if ($LASTEXITCODE -ne 0) { throw 'Python dependency validation failed.' }
-          python -m compileall -q voiceprompt tests
-          if ($LASTEXITCODE -ne 0) { throw 'Python compilation failed.' }
-          python scripts/verify_versions.py
-      - name: Audit Python dependencies
-        shell: pwsh
-        run: |
-          python -m pip install --target .tools/audit-deps pip-audit==2.10.1
-          New-Item -ItemType Directory -Force build | Out-Null
-          $env:PYTHONPATH = (Join-Path $PWD '.tools/audit-deps')
-          python -m pip_audit -r requirements-lock.txt --no-deps --disable-pip --format json --output build/python-audit.json
-      - name: Engine, storage, transport and recording regressions
-        env:
-          VOICEPROMPT_TEST_LEGACY_TK: '0'
-          HF_HOME: ${{ runner.temp }}/voiceprompt-test-hf
-        run: |
-          python -m unittest discover -s tests -v
-          if ($LASTEXITCODE -ne 0) { throw 'Python regressions failed.' }
-          python scripts/check_engine_bridge.py
-      - name: Native clipboard preservation and delivery
-        run: python scripts/check_clipboard_handoff.py --allow-hosted-runner-clipboard
-      - name: Frontend checks
-        working-directory: desktop
-        run: |
-          npm ci
-          if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
-          npm run test
-          if ($LASTEXITCODE -ne 0) { throw 'Frontend regressions failed.' }
-          npm run build
-          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
-          npm audit --omit=dev --audit-level=high
-      - name: Browser interaction and accessibility checks
-        working-directory: desktop
-        run: |
-          npx playwright install chromium
-          if ($LASTEXITCODE -ne 0) { throw 'Browser installation failed.' }
-          node scripts/verify-ui.cjs --preview
+      - name: Required source and browser checks
+        uses: ./.github/actions/release-checks
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: VoicePrompt-ui-checks
-          retention-days: 1
+          retention-days: 90
           path: |
             .impeccable/review/*.png
             build/ui-checks.json
             build/python-audit.json
             build/clipboard-handoff.json
+            build/model-library-review/
+            build/source-bridge.json
   native-package:
     runs-on: windows-latest
     steps:
@@ -119,15 +83,16 @@ jobs:
       - name: Verify actual native bridge and floating controls
         shell: pwsh
         run: ./scripts/check_native.ps1 -Python python
-      - name: Verify installation and live uninstall
+      - uses: ./.github/actions/previous-stable
+      - name: Verify installation, upgrade, binary rollback and live uninstall
         shell: pwsh
-        run: ./scripts/check_installer.ps1 -AllowUnsignedPreview
+        run: ./scripts/check_installer.ps1 -AllowUnsignedPreview -BaselineInstaller build/previous-stable/VoicePrompt-Setup-0.6.3-x64.exe
       - name: Stage verified beta installer
         if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-beta]')
         uses: actions/upload-artifact@v4
         with:
           name: VoicePrompt-beta-release
-          retention-days: 1
+          retention-days: 90
           if-no-files-found: error
           path: |
             release/VoicePrompt-Setup-*-x64-unsigned-preview.exe
@@ -137,13 +102,13 @@ jobs:
         if: always()
         with:
           name: VoicePrompt-windows-x64-unsigned-preview
-          retention-days: 1
+          retention-days: 90
           path: |
             build/frozen-smoke.json
             build/frozen-bridge.json
             build/installer-check.json
             build/native-checks.json
-            build/rust-audit-0.6.0.json
+            build/rust-audit.json
             build/native-*.log
             build/uninstall-*.log
             .impeccable/review/native-*.png
@@ -168,9 +133,9 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Select-String -Path pyproject.toml -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Beta application version must be numeric.' }
-          $tag = "v$version-beta.1"
-          $notes = "docs/release-notes-$version-beta.1.md"
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-(?:rc|beta|preview)\.[1-9]\d*)?$') { throw 'Invalid preview version.' }
+          $tag = if ($version.Contains('-')) { "v$version" } else { "v$version-beta.1" }
+          $notes = if ($version.Contains('-')) { "docs/release-notes-$version.md" } else { "docs/release-notes-$version-beta.1.md" }
           $installer = "release/VoicePrompt-Setup-$version-x64-unsigned-preview.exe"
           if (-not (Test-Path -LiteralPath $notes) -or -not (Test-Path -LiteralPath $installer)) { throw 'Beta release notes and the verified installer are required.' }
           git merge-base --is-ancestor HEAD origin/main
@@ -179,11 +144,9 @@ jobs:
           if ($LASTEXITCODE -eq 0) { throw 'Release already exists. Use a new version; never replace release assets.' }
           $expected = ((Get-Content -LiteralPath "$installer.sha256" -Raw).Trim() -split '\s+')[0]
           if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Installer checksum does not match the verified artifact.' }
-          gh release create $tag $installer "$installer.sha256" "$installer.signing.json" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --prerelease --title "VoicePrompt $version Beta 1" --notes-file $notes
+          gh release create $tag $installer "$installer.sha256" "$installer.signing.json" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --prerelease --title "VoicePrompt $version Preview" --notes-file $notes
           if ($LASTEXITCODE -ne 0) { throw 'Draft upload failed. Nothing was published.' }
-          gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern (Split-Path -Leaf $installer) --dir build/published-beta-check
-          if ($LASTEXITCODE -ne 0) { throw 'Could not independently download the draft installer.' }
-          $hosted = Join-Path 'build/published-beta-check' (Split-Path -Leaf $installer)
-          if ((Get-FileHash -LiteralPath $hosted -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Hosted installer checksum differs. The release remains a draft.' }
+          python scripts/verify_release_assets.py --tag $tag --installer $installer
+          if ($LASTEXITCODE -ne 0) { throw 'Hosted beta verification failed; the release remains a draft.' }
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Beta publication failed; inspect the draft.' }

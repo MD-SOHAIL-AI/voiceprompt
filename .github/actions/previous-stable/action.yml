@@ -1,0 +1,15 @@
+name: Authenticate previous stable installer
+description: Download the pinned previous stable for clean-runner upgrade and binary rollback tests.
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        New-Item -ItemType Directory -Force build/previous-stable | Out-Null
+        gh release download v0.6.3 --repo MD-SOHAIL-AI/voiceprompt --dir build/previous-stable --pattern VoicePrompt-Setup-0.6.3-x64.exe --pattern latest.json
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot download the previous stable test fixture.' }
+        if ((Get-FileHash build/previous-stable/VoicePrompt-Setup-0.6.3-x64.exe -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'e9530b627ab67c9a9bb4259556b21fc6b09efbaf74db2067abec66d1ba96edee') { throw 'Previous stable bytes differ from the reviewed fixture.' }
+        python scripts/release_updates.py verify --metadata build/previous-stable/latest.json --installer build/previous-stable/VoicePrompt-Setup-0.6.3-x64.exe --native-exe dist/VoicePrompt/VoicePrompt.exe
+        if ($LASTEXITCODE -ne 0) { throw 'Previous stable update authentication failed.' }

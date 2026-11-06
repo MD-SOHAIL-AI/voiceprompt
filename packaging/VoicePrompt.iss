@@ -1,5 +1,8 @@
 #ifndef AppVersion
-  #define AppVersion "0.5.2"
+  #error AppVersion must be supplied by the release build script.
+#endif
+#ifndef AppFileVersion
+  #define AppFileVersion AppVersion
 #endif
 #define RepoRoot AddBackslash(SourcePath) + ".."
 #if !defined(SignedRelease) && !defined(UnsignedPreview) && !defined(UpdateSignedRelease)
@@ -16,6 +19,8 @@
 AppId={{C6514AAC-8670-440C-A62D-F0E6EBBE04D1}
 AppName=VoicePrompt
 AppVersion={#AppVersion}
+VersionInfoVersion={#AppFileVersion}
+VersionInfoProductVersion={#AppVersion}
 AppPublisher=VoicePrompt contributors
 AppPublisherURL=https://github.com/MD-SOHAIL-AI/voiceprompt
 AppSupportURL=https://github.com/MD-SOHAIL-AI/voiceprompt/issues

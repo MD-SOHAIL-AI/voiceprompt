@@ -254,6 +254,26 @@ export function Onboarding() {
     runtime = useApp((s) => s.runtime);
   const action = useAction();
   const [open, setOpen] = useState(true);
+  const [installedModel, setInstalledModel] = useState<string | null>(null);
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener("voiceprompt:setup", show);
+    return () => window.removeEventListener("voiceprompt:setup", show);
+  }, []);
+  useEffect(() => {
+    if (!open || !settings || settings.onboarding_completed) return;
+    let closed = false;
+    const selected = settings.selected_model_id;
+    const load = async () => {
+      try {
+        const library = await request<{ models: { id: string; installed: boolean }[] }>("models.list");
+        if (!closed) setInstalledModel(selected === "legacy" || library.models.some((model) => model.id === selected && model.installed) ? selected : null);
+      } catch { if (!closed) setInstalledModel(null); }
+    };
+    void load();
+    const timer = setInterval(() => void load(), 1000);
+    return () => { closed = true; clearInterval(timer); };
+  }, [open, settings?.selected_model_id, settings?.onboarding_completed]);
   if (!settings || !runtime || settings.onboarding_completed) return null;
   return (
     <Modal
@@ -279,8 +299,8 @@ export function Onboarding() {
         <li>
           <strong>Prepare your local speech model</strong>
           <p>
-            The first preparation downloads the selected model. Cached models
-            work offline.
+            Download a model in Settings, then choose Use model to prepare it.
+            Downloaded models work offline.
           </p>
           <Button
             onClick={() => { setOpen(false); navigate("Settings"); }}
@@ -288,7 +308,7 @@ export function Onboarding() {
             Choose and download a model
           </Button>
           <Button
-            disabled={runtime.working || action.pending}
+            disabled={installedModel !== settings.selected_model_id || runtime.working || action.pending}
             onClick={() => void action.run("prepare")}
           >
             Prepare model

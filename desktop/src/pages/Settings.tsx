@@ -336,11 +336,11 @@ export function SettingsPage() {
           </p>
           <div className="button-row">
             <Button
-              onClick={() => {
+              onClick={async () => {
                 useApp.setState({ page: "Dictation" });
-                void action.run("settings.save", {
+                if (await action.run("settings.save", {
                   settings: { onboarding_completed: false },
-                });
+                })) window.dispatchEvent(new Event("voiceprompt:setup"));
               }}
             >
               Run setup again

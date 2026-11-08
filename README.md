@@ -8,20 +8,19 @@ Hold **Right Ctrl**, speak, then release. VoicePrompt finishes the complete reco
 
 Get the Windows Setup executable from [GitHub Releases](https://github.com/MD-SOHAIL-AI/voiceprompt/releases). Install it for your Windows account, open VoicePrompt, and follow the microphone setup steps. Python and terminal commands are not required for the packaged app.
 
-[VoicePrompt 0.6.3](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.6.3)
-delivers the floating island fix through the signed in-app update channel.
+[VoicePrompt 0.7.1](https://github.com/MD-SOHAIL-AI/voiceprompt/releases/tag/v0.7.1)
+delivers the model library, recording completeness checks and clipboard delivery
+fixes through the signed in-app update channel once the release workflow publishes it.
 On installed versions 0.6.1 or later, open **Settings → Check for updates**, choose
 **Update now**, then **Restart to update**. Older versions need one manual
 installation. Saved data and model caches are preserved. Update signatures are
 verified by the app; Windows publisher signing remains separate. See the
-[release notes](docs/release-notes-0.6.3.md) for installation and validation limits.
+[release notes](docs/release-notes-0.7.1.md) for installation and validation limits.
 
-Current development is **0.7.1-rc.1**: downloadable/deletable model profiles,
-recording completeness checks, clipboard handoff fixes, and clearer setup.
-See the [candidate notes](docs/release-notes-0.7.1-rc.1.md) and
-[readiness record](docs/release-readiness-plan-0.7.md). Candidates require manual
-installation and are excluded from the stable update feed. Ordinary main pushes
-do not publish releases.
+The stable release version is **0.7.1**, newer than 0.7.1 RC 1 and earlier 0.7.0
+test builds. See the [release record](docs/release-acceptance-0.7.1.md) for automated
+gates and outstanding device acceptance. Candidates remain excluded from the
+stable update feed. Ordinary main pushes do not publish releases.
 
 Windows can show **Windows protected your PC** for these unsigned installers.
 Publisher signing is not configured yet. See [Windows signing and SmartScreen](docs/windows-signing.md)
@@ -45,10 +44,9 @@ main. See [update setup and release instructions](docs/app-updates.md).
 
 ## Voice typing
 
-The current source adds a downloadable model library and persistent insertion
+Version 0.7.1 adds a downloadable model library and persistent insertion
 recovery. See [model library and recovery](docs/model-library.md) for operation,
-catalog publication, and verification limits. These changes are not yet part of
-the published 0.6.3 installer linked above.
+catalog publication, and verification limits.
 
 In **Settings → Appearance**, choose Light, Dark, or System brightness and a
 Black, Forest, Graphite, Ocean, Lavender, or Sand color theme. Black is the default. Changes save automatically
@@ -57,7 +55,7 @@ and update both windows. **Show floating island** hides or reveals it;
 expanded island offers the same control. The Island transparency slider ranges from Solid to 25% transparent; text and controls remain opaque. With pinning off, active recordings,
 timers, alarms and pending reminders still keep the island visible.
 
-1. In current candidates, open **Settings → Models**, download a model, then choose **Use model**. Choose a microphone and use **Check microphone**. Published 0.6.3 uses its earlier model preparation controls.
+1. In 0.7.1, open **Settings → Models**, download a model, then choose **Use model**. Choose a microphone and use **Check microphone**. Version 0.6.3 uses its earlier model preparation controls.
 2. Wait for **Ready to dictate**.
 3. Put the cursor in the destination application.
 4. Hold Right Ctrl, speak, and release. Settings also offers press-to-start/stop mode and alternative keys.
@@ -86,7 +84,7 @@ Timers and planner data work offline. Alarm delivery requires VoicePrompt to be 
 
 Settings, history, planner data, runtime caches, and bounded diagnostics live under `%LOCALAPPDATA%\VoicePrompt`. Existing data stays in place; configuration migration and the first desktop planner upgrade create backups. Uninstall preserves user data and cached models.
 
-Audio and transcript processing remain local. Gemini and OpenRouter integrations and key-entry controls have been removed. Upgrading retires VoicePrompt's old provider credentials from Windows Credential Manager; a failed removal can be retried in Settings. Current candidates download models only on request and can refresh signed model metadata from GitHub. Contest schedules use their existing online services. CLIST credentials remain in Windows Credential Manager, separate from settings and SQLite.
+Audio and transcript processing remain local. Gemini and OpenRouter integrations and key-entry controls have been removed. Upgrading retires VoicePrompt's old provider credentials from Windows Credential Manager; a failed removal can be retried in Settings. Version 0.7.1 downloads models only on request and can refresh signed model metadata from GitHub. Contest schedules use their existing online services. CLIST credentials remain in Windows Credential Manager, separate from settings and SQLite.
 
 History contains transcript text on this device. Set its limit to zero to disable future persistence, or use **Clear history**. Diagnostic metrics contain timestamps, duration, backlog, stop reason, engine, and outcome, without transcript text or audio. No telemetry is uploaded automatically.
 

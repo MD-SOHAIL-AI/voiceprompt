@@ -4,11 +4,11 @@ VSVersionInfo(
   kids=[StringFileInfo([StringTable('040904B0', [
     StringStruct('CompanyName', 'VoicePrompt contributors'),
     StringStruct('FileDescription', 'VoicePrompt desktop'),
-    StringStruct('FileVersion', '0.7.1-rc.1'),
+    StringStruct('FileVersion', '0.7.1'),
     StringStruct('InternalName', 'VoicePrompt'),
     StringStruct('OriginalFilename', 'VoicePrompt.exe'),
     StringStruct('ProductName', 'VoicePrompt'),
-    StringStruct('ProductVersion', '0.7.1-rc.1'),
+    StringStruct('ProductVersion', '0.7.1'),
     StringStruct('LegalCopyright', 'Copyright 2026 VoicePrompt contributors')
   ])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])]
 )

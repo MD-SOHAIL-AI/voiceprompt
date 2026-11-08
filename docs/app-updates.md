@@ -80,9 +80,10 @@ verified local stage and is never used by CI.
 Existing users need one manual installation of this first updater-enabled build.
 Subsequent stable releases support the complete in-app flow.
 
-Version 0.6.3 is newer than both recent betas and uses the existing signing
-identity. Installed 0.6.1 and 0.6.2 apps can therefore discover and authenticate
-it. Beta releases stay outside this feed. Versions older than 0.6.1 still need
+Version 0.7.1 is newer than 0.6.3, earlier 0.7.0 test builds and 0.7.1 RC 1,
+and uses the existing signing identity. Installed updater-enabled apps can
+therefore discover and authenticate it after stable publication. Beta and RC
+releases stay outside this feed. Versions older than 0.6.1 still need
 one manual installation because they do not contain the updater.
 
 ## Verification, data and recovery

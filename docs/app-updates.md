@@ -54,6 +54,15 @@ tag-release build step; they are not passed to PR tests or artifacts.
 2. Add `docs/release-notes-VERSION.md`, run checks, and merge into main.
 3. Push the matching stable version tag, such as `v0.6.3`.
 
+Alternatively, merge the release PR with **`[publish-stable]`** in the merge
+commit message. After both Windows CI jobs pass on that exact main commit,
+`start-stable-release.yml` creates its matching version tag and explicitly
+dispatches the same stable workflow on the tag. The starter rejects fork/PR
+runs, failed or unmarked runs, candidates, mismatched checkouts and existing
+tags for another object. It never moves a tag. This route needs no local CLI
+or new secret, and retains all signing, production-review and hosted-byte gates.
+Routine main merges without the marker do not request publication.
+
 `.github/workflows/release.yml` verifies tag/main ancestry, runs regressions,
 builds the complete app, signs metadata, verifies it using the packaged native
 app, checks the engine/native UI/installer and pinned previous-stable upgrade,

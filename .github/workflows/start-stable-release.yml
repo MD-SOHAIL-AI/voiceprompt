@@ -1,0 +1,35 @@
+name: Start requested stable release
+on:
+  workflow_run:
+    workflows: ['Windows app']
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: voiceprompt-stable-release-request
+  cancel-in-progress: false
+jobs:
+  start:
+    if: >-
+      github.repository == 'MD-SOHAIL-AI/voiceprompt' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      contains(github.event.workflow_run.head_commit.message, '[publish-stable]')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Tag the verified source and dispatch the guarded release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/start_stable_release.py --event "$env:GITHUB_EVENT_PATH"
